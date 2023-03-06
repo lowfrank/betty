@@ -1,0 +1,5 @@
+**/target
+mod.betty
+source.betty
+test.betty
+**/std

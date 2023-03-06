@@ -1,0 +1,27 @@
+[package]
+name = "betty"
+version = "0.1.0"
+rust-version = "1.65"
+edition = "2021"
+authors = ["Francesco Basso fra2000.basso@gmail.com"]
+description = """
+betty is a general purpose programming language.
+It is high level, functional and dynamically typed."""
+
+[package.metadata]
+credits = ["Alessandro Bongiovanni", "Matteo Penasso"]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+clap = { version = "4.1.4", features = ["derive"] }  # 4.0.24
+device_query = "1.1.1"
+lazy_static = "1.4.0"
+
+[profile.release]
+panic = "abort"
+lto = true
+codegen-units = 1
+
+[profile.dev.package."*"]
+opt-level = 3
