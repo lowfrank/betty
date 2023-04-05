@@ -77,7 +77,7 @@ impl Parser {
     fn node(&mut self) -> ParserResult {
         match (self.current_token.kind.clone(), self.peek_token_kind()) {
             (TokenKind::Ident(ident), Some(op))
-                if ASSIGN_KIND.contains(op) || op == &TokenKind::Comma =>
+                if ASSIGN_KIND.contains(op) =>
             {
                 self.assign_expr(ident)
             }
@@ -100,93 +100,13 @@ impl Parser {
     fn assign_expr(&mut self, ident: String) -> ParserResult {
         let line = self.current_token.line;
         self.advance(); // skip ident
-
-        let mut identifiers = vec![ident];
-        while self.current_token.kind == TokenKind::Comma {
-            self.advance(); // skip ','
-            self.skip_newlines();
-            let ident = match self.current_token.kind.clone() {
-                TokenKind::Ident(ident) => ident,
-                kind => {
-                    return Err(Error::syntax(
-                        format!("Expected identifier, got {}", kind),
-                        self.ctx.set_line(self.current_token.line),
-                    ))
-                }
-            };
-            identifiers.push(ident);
-            self.advance(); // skip ident
-        }
-
-        /*
-        This self.skip_newlines() should allow us for this
-
-        very_long_var_name,
-        extremely_long_var_name
-        ::
-        10,
-        20
-
-        */
-        self.skip_newlines();
         let op = self.current_token.kind.clone();
-        if identifiers.len() > 1 && op != TokenKind::Assign {
-            return Err(Error::syntax(
-                format!(
-                    "Expected {} when assigning to multiple variable at once, got {}",
-                    TokenKind::Assign,
-                    self.current_token.kind
-                ),
-                self.ctx.set_line(self.current_token.line),
-            ));
-        }
-        self.advance(); // Skip op
+        self.advance();
         self.skip_newlines();
-
-        let mut expressions = vec![self.expr()?]; // we gotta have at least 1 expr
-        while self.current_token.kind == TokenKind::Comma {
-            self.advance(); // skip comma
-            let expr = self.expr()?;
-            expressions.push(expr);
-            if self.current_token.kind == TokenKind::Comma {
-                self.skip_newlines(); // otherwise we would skip a NECESSARY like for the next stmt
-            }
-        }
-
-        match (identifiers.len(), expressions.len()) {
-            (1, 1) => Ok(Node::new(NodeKind::AssignOneToOne {
-                ident: identifiers.remove(0),
-                op,
-                expr: Box::new(expressions.remove(0))
-            }, line)),
-            (ident_num, 1) if ident_num > 1 && op == TokenKind::Assign => {
-                Ok(Node::new(NodeKind::AssignManyToOne {
-                    identifiers,
-                    expr: Box::new(expressions.remove(0)),
-                }, line))
-            },
-            (ident_num, expr_num)
-                if ident_num > 1 && expr_num > 1 && ident_num == expr_num && op == TokenKind::Assign => {
-                Ok(Node::new(NodeKind::AssignManyToMany {
-                    identifiers,
-                    expressions,
-                }, line))
-            },
-            (ident_num, expr_num) => Err(Error::syntax(format!("\
-                Invalid number of identifiers/expressions or assign token provided in assign statement (the following examples are valid:\n\t\t\
-                    (1) 1 identifier followed by one of {} followed by 1 expression (one to one),\n\t\t\
-                    (2) many identifiers followed by {} followed by object {} (must not be empty) (many to one, also called 'unpacking assignment'),\n\t\t\
-                    (3) many identifiers followed by {} followed by many expressions, as long as the number of identifiers and expression is the same (many to many).\n\t\
-                    Got {} identifiers, {} as assign operator, {} expressions",
-                    ASSIGN_KIND.iter().map(|kind| kind.to_string()).collect::<Vec<_>>().join(", "),
-                    TokenKind::Assign,
-                    Type::Vector,
-                    TokenKind::Assign,
-                    ident_num,
-                    op,
-                    expr_num
-            ), self.ctx.set_line(line)))
-        }
+        let expr = self.expr()?;
+        Ok(Node::new(NodeKind::Assign {
+            ident, op, expr: Box::new(expr),
+        }, line))
     }
 
     fn expr(&mut self) -> ParserResult {

@@ -52,9 +52,9 @@ macro_rules! range {
             )),
             cmp::Ordering::Equal => Rc::new(RefCell::new(Vec::new())),
             cmp::Ordering::Greater => Rc::new(RefCell::new(
-                ($end..$start)
+                ($end..=$start)
                     .rev()
-                    .filter(|x| x % $step == 0)
+                    .filter(|x| (x - $start) % $step == 0)
                     .map(Object::Int)
                     .collect::<Vec<_>>(),
             )),
@@ -447,7 +447,7 @@ impl BuiltinFn for ToFloat {
                 )),
             },
             _ => Err(CFError(
-                ErrorKind::Value,
+                ErrorKind::Type,
                 expected_value_err_msg(
                     format!(
                         "object {} or object {} or object {}",
@@ -917,23 +917,26 @@ impl BuiltinFn for Split {
                         v.iter().map(Object::duplicate).collect(),
                     ))));
                 }
-                let mut tmp = Vec::new();
+                // Type annotation is needed here
+                let mut tmp = Vec::<&Object>::new();
                 let mut result = Vec::new();
                 for item in v {
                     if item == &split {
                         result.push(Object::Vector(Rc::new(RefCell::new(
                             tmp.iter()
-                                .map(|x: &&Object| x.duplicate())
+                                .map(|x| x.duplicate())
                                 .collect::<Vec<_>>(),
                         ))));
                         tmp.clear();
                     } else {
-                        tmp.push(item)
+                        tmp.push(item);
                     }
                 }
-                if tmp.is_empty() {
-                    result.push(Object::Vector(Rc::new(RefCell::new(Vec::new()))));
-                }
+                result.push(Object::Vector(Rc::new(RefCell::new(
+                    tmp.into_iter()
+                        .map(Object::duplicate)
+                        .collect::<Vec<_>>(),
+                ))));
                 Ok(Object::Vector(Rc::new(RefCell::new(result))))
             }
             (Object::String(s), Object::String(split)) => {
@@ -946,7 +949,7 @@ impl BuiltinFn for Split {
             }
             (obj, split) => Err(CFError(
                 ErrorKind::Type,
-                format!("Expected (object {}, object {}) or object {}, any) as arguments of builtin function '{}', got ({}, {})",
+                format!("Expected (object {}, object {}) or (object {}, any) as arguments of builtin function '{}', got ({}, {})",
                     Type::String,
                     Type::String,
                     Type::Vector,
@@ -1067,64 +1070,5 @@ impl BuiltinFn for TypeOf {
         Self::check_args_len(args.len())?;
         let obj = Self::arg(&mut args);
         Ok(Object::Type(Type::from(obj)))
-    }
-}
-
-builtin_fn!(Format, BUILTIN_FORMAT, 999);
-impl BuiltinFn for Format {
-    #[inline]
-    fn call(&self, mut args: FunArgs) -> CFResult {
-        if args.len() < 2 {
-            return Err(CFError(
-                ErrorKind::WrongArgumentsNumber,
-                format!(
-                    "Expected two or more arguments for call to builtin function '{}', got {}",
-                    Self::NAME,
-                    args.len(),
-                ),
-            ));
-        }
-
-        let s = Self::str_from_args(&mut args, 1)?;
-        if s.matches('$').count() != args.len() {
-            return Err(CFError(
-                ErrorKind::WrongArgumentsNumber,
-                format!(
-                    "The number of '$' and len(arguments) - 1 must be the same in builtin function '{}'",
-                    Self::NAME,
-                ),
-            ));
-        }
-
-        let mut result = String::new();
-        result.reserve(s.len());  // At least input str capacity
-        for ch in s.chars() {
-            if ch == '$' {
-                let Some(obj) = args.pop_front() else {
-                    return Err(CFError(
-                        ErrorKind::WrongArgumentsNumber,
-                        format!(
-                            "Too few arguments in builtin function '{}' (the number of '$' and arguments must match)",
-                            Self::NAME,
-                        ),
-                    ));
-                };
-                result = format!("{}{}", result, obj);
-            } else {
-                result.push(ch);
-            }
-        }
-
-        if !args.is_empty() {
-            Err(CFError(
-                ErrorKind::WrongArgumentsNumber,
-                format!(
-                    "Too many arguments in builtin function '{}' (the number of '$' and arguments must match)",
-                    Self::NAME,
-                ),
-            ))
-        } else {
-            Ok(Object::String(result))
-        }
     }
 }

@@ -126,16 +126,7 @@ impl Interpreter {
             }
             NodeKind::UnaryOp { op, right } => self.visit_unary_op_node(op, *right, node.line),
             NodeKind::Ident { ident } => self.visit_ident_node(ident, node.line),
-            NodeKind::AssignOneToOne { ident, op, expr } => {
-                self.visit_assign_one_to_one(ident, op, *expr, node.line)
-            }
-            NodeKind::AssignManyToOne { identifiers, expr } => {
-                self.visit_assign_many_to_one(identifiers, *expr, node.line)
-            }
-            NodeKind::AssignManyToMany {
-                identifiers,
-                expressions,
-            } => self.visit_assign_many_to_many(identifiers, expressions),
+            NodeKind::Assign { ident, op, expr } => self.visit_assign_node(ident, op, *expr, node.line),
             NodeKind::If { cases } => self.visit_if_node(cases, node.line),
             NodeKind::While { condition, body } => {
                 self.visit_while_node(*condition, body, node.line)
@@ -268,13 +259,7 @@ impl Interpreter {
     }
 
     #[inline]
-    fn visit_assign_one_to_one(
-        &mut self,
-        ident: String,
-        op: TokenKind,
-        expr: Node,
-        line: Line,
-    ) -> InterpreterResult {
+    fn visit_assign_node(&mut self, ident: String, op: TokenKind, expr: Node, line: Line) -> InterpreterResult {
         let result = self.visit(expr)?;
 
         if op == TokenKind::Assign {
@@ -299,57 +284,6 @@ impl Interpreter {
             self.namespace.add(ident, result);
         }
 
-        Ok(Object::Nothing)
-    }
-
-    #[inline]
-    fn visit_assign_many_to_one(
-        &mut self,
-        identifiers: Vec<String>,
-        expr: Node,
-        line: Line,
-    ) -> InterpreterResult {
-        let obj = self.visit(expr)?;
-        let Object::Vector(v) = obj else {
-            return Err(Error::new(
-                ErrorKind::Type,
-                format!("Expected object {} in many to one assignment, got {}", Type::Vector, obj.kind()),
-                self.ctx.set_line(line))
-            );
-        };
-
-        let v = &*v.borrow();
-
-        if v.len() != identifiers.len() || v.is_empty() {
-            return Err(Error::value(
-                format!(
-                    "Mismatched number of identifiers and object {} items in many to one assignment (left len: {}, right len: {})",
-                    Type::Vector,
-                    identifiers.len(),
-                    v.len(),
-
-                ),
-                self.ctx.set_line(line),
-            ));
-        }
-
-        for (ident, obj) in identifiers.into_iter().zip(v) {
-            self.namespace.add(ident, obj.duplicate());
-        }
-
-        Ok(Object::Nothing)
-    }
-
-    #[inline]
-    fn visit_assign_many_to_many(
-        &mut self,
-        identifiers: Vec<String>,
-        expressions: Vec<Node>,
-    ) -> InterpreterResult {
-        for (ident, expr) in identifiers.into_iter().zip(expressions) {
-            let obj = self.visit(expr)?;
-            self.namespace.add(ident, obj);
-        }
         Ok(Object::Nothing)
     }
 
@@ -561,7 +495,6 @@ impl Interpreter {
                 let mut namespace = Namespace::from(&self.namespace);
                 self.setup_function(args, arg_names, Some(&func_name), line, &mut namespace)?;
                 let ctx = self.ctx.set_line(line); // Already clones it
-                dbg!(&self.ctx);
                 call_function(
                     func_name,
                     body,

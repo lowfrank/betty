@@ -146,6 +146,10 @@ fn populate_namespace() -> HashMap<String, Object> {
             Object::BuiltinFun(BUILTIN_STR_STARTS_WITH.into()),
         ),
         (
+            BUILTIN_STR_ENDS_WITH.into(),
+            Object::BuiltinFun(BUILTIN_STR_ENDS_WITH.into()),
+        ),
+        (
             BUILTIN_STR_IS_UPPERCASE.into(),
             Object::BuiltinFun(BUILTIN_STR_IS_UPPERCASE.into()),
         ),
@@ -210,10 +214,6 @@ fn populate_namespace() -> HashMap<String, Object> {
         (
             BUILTIN_ERR_KIND.into(),
             Object::BuiltinFun(BUILTIN_ERR_KIND.into()),
-        ),
-        (
-            BUILTIN_FORMAT.into(),
-            Object::BuiltinFun(BUILTIN_FORMAT.into()),
         ),
         (Type::INT_LITERAL.into(), Object::Type(Type::Int)),
         (Type::FLOAT_LITERAL.into(), Object::Type(Type::Float)),

@@ -15,15 +15,6 @@ impl Node {
     pub fn new(kind: NodeKind, line: Line) -> Self {
         Self { kind, line }
     }
-
-    pub fn is_assign(&self) -> bool {
-        matches!(
-            self.kind,
-            NodeKind::AssignOneToOne { .. }
-                | NodeKind::AssignManyToOne { .. }
-                | NodeKind::AssignManyToMany { .. }
-        )
-    }
 }
 
 #[derive(Clone, PartialEq, Debug)]
@@ -117,18 +108,10 @@ pub enum NodeKind {
     InfiniteLoop {
         body: Vec<Node>,
     },
-    AssignOneToOne {
+    Assign {
         ident: String,
         op: TokenKind,
         expr: Box<Node>,
-    },
-    AssignManyToOne {
-        identifiers: Vec<String>,
-        expr: Box<Node>,
-    },
-    AssignManyToMany {
-        identifiers: Vec<String>,
-        expressions: Vec<Node>,
     },
     Using {
         nodes: Vec<Node>,

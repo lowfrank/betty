@@ -76,7 +76,7 @@ impl fmt::Display for Object {
                 )
             }
             Self::Bool(x) => write!(f, "{}", x),
-            Self::Nothing => write!(f, "{}", Type::NOTHING_LITERAL),
+            Self::Nothing => write!(f, "nothing"),
             Self::Fun(..) => write!(f, "{}", self.kind()),
             Self::BuiltinFun(..) => write!(f, "{}", self.kind()),
             Self::AnonymousFun(..) => write!(f, "{}", self.kind()),
@@ -649,7 +649,6 @@ builtin_fun_caller! {
 
     BUILTIN_ASSERT => Assert,
     BUILTIN_TYPEOF => TypeOf,
-    BUILTIN_FORMAT => Format,
 }
 
 lazy_static! {

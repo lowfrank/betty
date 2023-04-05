@@ -40,7 +40,6 @@ pub const BUILTIN_ERR_KIND: &str = "err_kind";
 // Utilities
 pub const BUILTIN_ASSERT: &str = "assert";
 pub const BUILTIN_TYPEOF: &str = "typeof";
-pub const BUILTIN_FORMAT: &str = "format";
 
 // Iterables
 pub const BUILTIN_LEN: &str = "len";

@@ -165,16 +165,17 @@ impl BettyRepl {
         }
     }
 
+    /// The REPL gets input as long as CTRL+Enter is not pressed,
+    /// to allow for multiline input by default
     pub fn run(self) {
         main_thread!(self.stack_size, {
             let mut interpreter = Interpreter::repl().insert_args(self.args);
             Self::print_version();
             loop {
-                if Self::should_quit() {
-                    return;
-                }
-
-                let source = Self::get_source();
+                let Some(source) = Self::get_source() else {
+                    println!();
+                    return;  // quit keys have been pressed
+                };
 
                 let tokens = match Lexer::new(None, source.chars().collect()).make_tokens() {
                     Ok(Some(tokens)) => tokens,
@@ -209,34 +210,37 @@ impl BettyRepl {
         println!("{}\n{}", descr, sep);
     }
 
-    fn should_quit() -> bool {
-        let keys = DeviceState::new().get_keys();
-        keys == QUIT_KEYS
-    }
-
-    fn get_source() -> String {
+    fn get_source() -> Option<String> {
         let mut source = String::new();
-        let device_state = DeviceState::new();
+        let keyboard = DeviceState::new();
 
-        loop {
-            print!(">>> ");
+        print!(">>> ");
+        io::stdout()
+            .flush()
+            .expect("Fatal internal error in flushing stdout while getting repl source");
+        io::stdin()
+            .read_line(&mut source)
+            .expect("Fatal internal error in reading stdin while getting repl source");
+
+        while keyboard.get_keys() != MULTILINE_SEQUENCE_KEYS {
+            if keyboard.get_keys() == QUIT_KEYS {
+                return None;
+            }
+            print!("... ");
             io::stdout()
                 .flush()
                 .expect("Fatal internal error in flushing stdout while getting repl source");
             io::stdin()
                 .read_line(&mut source)
                 .expect("Fatal internal error in reading stdin while getting repl source");
-
-            if device_state.get_keys() != MULTILINE_SEQUENCE_KEYS {
-                break;
-            }
         }
+
         if source.ends_with('\n') {
             source.pop();
             if source.ends_with('\r') {
                 source.pop();
             }
         }
-        source
+        Some(source)
     }
 }
