@@ -126,7 +126,9 @@ impl Interpreter {
             }
             NodeKind::UnaryOp { op, right } => self.visit_unary_op_node(op, *right, node.line),
             NodeKind::Ident { ident } => self.visit_ident_node(ident, node.line),
-            NodeKind::Assign { ident, op, expr } => self.visit_assign_node(ident, op, *expr, node.line),
+            NodeKind::Assign { ident, op, expr } => {
+                self.visit_assign_node(ident, op, *expr, node.line)
+            }
             NodeKind::If { cases } => self.visit_if_node(cases, node.line),
             NodeKind::While { condition, body } => {
                 self.visit_while_node(*condition, body, node.line)
@@ -259,7 +261,13 @@ impl Interpreter {
     }
 
     #[inline]
-    fn visit_assign_node(&mut self, ident: String, op: TokenKind, expr: Node, line: Line) -> InterpreterResult {
+    fn visit_assign_node(
+        &mut self,
+        ident: String,
+        op: TokenKind,
+        expr: Node,
+        line: Line,
+    ) -> InterpreterResult {
         let result = self.visit(expr)?;
 
         if op == TokenKind::Assign {

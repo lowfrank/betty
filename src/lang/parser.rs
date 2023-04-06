@@ -76,9 +76,7 @@ impl Parser {
 
     fn node(&mut self) -> ParserResult {
         match (self.current_token.kind.clone(), self.peek_token_kind()) {
-            (TokenKind::Ident(ident), Some(op))
-                if ASSIGN_KIND.contains(op) =>
-            {
+            (TokenKind::Ident(ident), Some(op)) if ASSIGN_KIND.contains(op) => {
                 self.assign_expr(ident)
             }
             (TokenKind::KwIF, _) => self.if_node(),
@@ -104,9 +102,14 @@ impl Parser {
         self.advance();
         self.skip_newlines();
         let expr = self.expr()?;
-        Ok(Node::new(NodeKind::Assign {
-            ident, op, expr: Box::new(expr),
-        }, line))
+        Ok(Node::new(
+            NodeKind::Assign {
+                ident,
+                op,
+                expr: Box::new(expr),
+            },
+            line,
+        ))
     }
 
     fn expr(&mut self) -> ParserResult {
@@ -710,7 +713,19 @@ impl Parser {
 
     fn get_fun_body(&mut self) -> ParserResults {
         self.nested_fun += 1;
+        // We isolate the loop count from the func body, otherwise the following
+        // would be valid
+        /*
+        for _ => 5 do
+            fun test() do
+                break
+            end
+        end
+        */
+        let nested_loop = self.nested_loop;
+        self.nested_loop = 0;
         let body = self.get_body();
+        self.nested_loop = nested_loop;
         self.nested_fun -= 1;
         body
     }
@@ -731,7 +746,7 @@ impl Parser {
         if !self.is_inside_fun() {
             return Err(Error::syntax(
                 format!("{} outside function", TokenKind::KwRETURN),
-                self.ctx.set_line(self.current_token.line),
+                self.ctx.set_line(line),
             ));
         }
 

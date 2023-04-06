@@ -93,6 +93,8 @@ impl Lexer {
         }
     }
 
+    /// A number can have as many underscores as we want, because we will simply
+    /// skip them in the number parsing
     fn make_number(&mut self) -> LexerResult {
         let mut num_str = String::new();
         loop {
@@ -115,6 +117,7 @@ impl Lexer {
         } else {
             match num_str.parse::<Int>() {
                 Ok(n) => Ok(Token::new(TokenKind::Int(n), self.line)),
+                // The only error that can occurr here is overflow!
                 Err(_) => Err(Error::new(
                     ErrorKind::Overflow,
                     num_str,
@@ -124,6 +127,7 @@ impl Lexer {
         }
     }
 
+    /// A string is a sequence of characters. Strings are immutable!
     fn make_string(&mut self) -> LexerResult {
         let mut string = String::new();
         self.advance(); // skip '"'
@@ -149,7 +153,10 @@ impl Lexer {
         ))
     }
 
+    /// Return the escape character if any (an escape character is the special
+    /// character such as \n \t \r, composed by two characters)
     fn get_escape_char(&mut self) -> Result<char, Error> {
+        // Skip the '\'
         self.advance();
         let Some(ch) = self.current_char else {
             return Err(Error::syntax(
@@ -161,10 +168,15 @@ impl Lexer {
         self.advance(); // skip the escape char
         match self.escape_chars.get(&ch) {
             Some(escape_char) => Ok(*escape_char),
+            // Return the character right after the '\' if there is no escape
+            // character associated. For example: \e \m \o, which are not valid
+            // escape characters
             None => Ok(ch),
         }
     }
 
+    /// Create a symbol composed of two characters. 'symbol' is the second
+    /// character to match
     fn make_symbol(
         &mut self,
         symbol: char,
@@ -193,7 +205,8 @@ impl Lexer {
         self.make_symbol('>', TokenKind::Eq, TokenKind::ThickArrow)
     }
 
-    #[inline]
+    /// Create the assign and reassign tokens. Return an error if there is an
+    /// invalid character after the first ':'
     fn make_colon(&mut self) -> LexerResult {
         self.advance(); // Skip first ':'
         let kind = match self.current_char {
@@ -225,11 +238,13 @@ impl Lexer {
         Ok(Token::new(kind, self.line))
     }
 
-    fn make_not(&mut self) -> LexerResult {
-        self.advance();
+    /// Create the 'not equals' token, or return an error if the character after the
+    /// '!' is not a '='
+    fn make_neq(&mut self) -> LexerResult {
+        self.advance(); // skip the '!'
 
         match self.current_char {
-            Some(ch) if ch == '=' => {
+            Some('=') => {
                 self.advance();
                 Ok(Token::new(TokenKind::Neq, self.line))
             }
@@ -240,7 +255,7 @@ impl Lexer {
         }
     }
 
-    #[inline]
+    /// Skip characters as long as a newline is not found
     fn skip_comment(&mut self) {
         while let Some(ch) = self.current_char {
             if ch == '\n' {
@@ -250,6 +265,7 @@ impl Lexer {
         }
     }
 
+    /// Iterate over all the characters and map them into tokens
     pub fn make_tokens(mut self) -> Result<Option<Vec<Token>>, Error> {
         let mut tokens = Vec::with_capacity(self.source.len());
         while let Some(ch) = self.current_char {
@@ -311,7 +327,7 @@ impl Lexer {
                 '>' => tokens.push(self.make_gt()),
                 '<' => tokens.push(self.make_lt()),
                 '=' => tokens.push(self.make_eq()),
-                '!' => tokens.push(self.make_not()?),
+                '!' => tokens.push(self.make_neq()?),
                 ',' => {
                     tokens.push(Token::new(TokenKind::Comma, self.line));
                     self.advance();
@@ -328,8 +344,9 @@ impl Lexer {
                 }
             }
         }
-
+        
         if tokens.is_empty() || tokens.iter().all(|token| token.kind == TokenKind::Newline) {
+            // Text is empty
             Ok(None)
         } else {
             tokens.push(Token::new(TokenKind::Eof, self.line));
@@ -338,6 +355,7 @@ impl Lexer {
     }
 }
 
+/// Builtin keywords
 fn keywords() -> HashMap<&'static str, TokenKind> {
     HashMap::from([
         ("and", TokenKind::KwAND),
@@ -364,6 +382,7 @@ fn keywords() -> HashMap<&'static str, TokenKind> {
     ])
 }
 
+/// Builtin escape characters
 fn escape_chars() -> HashMap<char, char> {
     HashMap::from([
         ('"', '\"'),
