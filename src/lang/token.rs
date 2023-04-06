@@ -1,3 +1,6 @@
+//! The [`Token`] `struct` represents the basic unit of syntax. A betty program
+//! is composed of a sequence of tokens.
+
 use std::fmt;
 
 use super::type_alias::{Float, Int, Line};
@@ -68,9 +71,10 @@ pub enum TokenKind {
     False,   // builtin identifier 'false'
     Nothing, // builtin identifier 'nothing'
 
-    Eof, // end of file, appended at the end of the tokens
+    Eof, // end of file, appended at the end of the token sequence
 }
 
+/// Print the token when an error is shown
 impl fmt::Display for TokenKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -135,6 +139,7 @@ impl fmt::Display for TokenKind {
     }
 }
 
+/// A [`Token`] is composed of a kind and the line where it is encountered.
 #[derive(Clone, Debug)]
 pub struct Token {
     pub kind: TokenKind,

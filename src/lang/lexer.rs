@@ -16,7 +16,7 @@ pub struct Lexer {
     source: VecDeque<char>,
 
     /// The holder of the current character, moves from the first to the last element
-    /// of `self.source`. When the source becomes empty, it gets the value of [`None`].
+    /// of `self.source`. When the source becomes empty, its value becomes [`None`].
     current_char: Option<char>,
 
     /// A map that associates each `betty` keyword to its literal
@@ -50,18 +50,13 @@ impl Lexer {
 
     #[inline]
     fn advance(&mut self) {
-        self.current_char = if self.source.is_empty() {
-            None
-        } else {
-            if Some('\n') == self.current_char {
-                self.line += 1;
-            }
-            self.source.pop_front()
-        };
+        self.current_char = self.source.pop_front();
+        if Some('\n') == self.current_char {
+            self.line += 1;
+        }
     }
 
     /// Create a new identifier.
-    ///
     /// As long as the value is a valid identifier character, that value is pushed to the end
     /// of a buffer. The loop stops when either we reach EOF or the character
     /// is not a valid identifier anymore. Then we check if the new identifier
