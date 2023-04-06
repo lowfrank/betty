@@ -339,7 +339,7 @@ impl Lexer {
                 }
             }
         }
-        
+
         if tokens.is_empty() || tokens.iter().all(|token| token.kind == TokenKind::Newline) {
             // Text is empty
             Ok(None)

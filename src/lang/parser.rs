@@ -8,6 +8,7 @@ use super::token::{Token, TokenKind};
 use super::typ::Type;
 use super::type_alias::{ParserResult, ParserResults};
 
+/// All the available assign tokens
 const ASSIGN_KIND: [TokenKind; 7] = [
     TokenKind::Assign,
     TokenKind::ReassignPlus,
@@ -19,10 +20,19 @@ const ASSIGN_KIND: [TokenKind; 7] = [
 ];
 
 pub struct Parser {
+    /// The sequence of tokens that will be parsed into the AST
     tokens: VecDeque<Token>,
+
+    /// The current token of the sequence
     current_token: Token,
+
+    /// How many levels of nested functions
     nested_fun: u64,
+
+    /// How many levels of nested loops
     nested_loop: u64,
+
+    /// The current context
     ctx: Ctx,
 }
 
@@ -38,21 +48,26 @@ impl Parser {
         }
     }
 
+    /// Set the context filename
     pub fn filename(mut self, filename: PathBuf) -> Self {
         self.ctx.filename = Some(filename);
         self
     }
 
+    /// Advance to the next token of the sequence
     #[inline]
     fn advance(&mut self) {
         self.current_token = self.tokens.pop_front().unwrap();
     }
 
+    /// Peek the next token kind of the sequence
     #[inline]
     fn peek_token_kind(&self) -> Option<&TokenKind> {
         self.tokens.get(0).map(|token| &token.kind)
     }
 
+    /// Skip newlines until a non-newline token is found. Return the result
+    /// whether at least one newline was skipped or not
     #[inline]
     fn skip_newlines(&mut self) -> bool {
         let mut newlines = false;
@@ -63,44 +78,78 @@ impl Parser {
         newlines
     }
 
+    /// Get a sequence of nodes until one of the token inside 'end_tokens'
+    /// or no newlines are encountered.
+    /// There has to be at least one node in the sequence.
     fn nodes(&mut self, end_tokens: &[TokenKind]) -> ParserResults {
         let mut nodes = Vec::new();
         self.skip_newlines();
-        nodes.push(self.node()?);
-        // as long as there are newlines and as long as there is no 'end' kw, we loop
+        nodes.push(self.node()?); // There has to be at least one node
+                                  // as long as there are newlines and as long as there is no end tokens, we loop
         while self.skip_newlines() && !end_tokens.contains(&self.current_token.kind) {
             nodes.push(self.node()?);
         }
         Ok(nodes)
     }
 
+    /// The [`Node`] at this level represents a statement, which is a command that
+    /// includes multiple statements and expressions and whose return value is nothing.
+    /// On the other hand, self.expr() always returns a value, which may not be nothing.
     fn node(&mut self) -> ParserResult {
         match (self.current_token.kind.clone(), self.peek_token_kind()) {
             (TokenKind::Ident(ident), Some(op)) if ASSIGN_KIND.contains(op) => {
+                // Assign statement
                 self.assign_expr(ident)
             }
+
+            // If statement
             (TokenKind::KwIF, _) => self.if_node(),
+
+            // For loop
             (TokenKind::KwFOR, _) => self.for_node(),
+
+            // Foreach loop
             (TokenKind::KwFOREACH, _) => self.foreach_node(),
+
+            // While loop
             (TokenKind::KwWHILE, _) => self.while_node(),
+
+            // Function statement
             (TokenKind::KwFUN, _) => self.fun_node(),
+
+            // Return statement
             (TokenKind::KwRETURN, _) => self.return_node(),
+
+            // Break statement
             (TokenKind::KwBREAK, _) => self.break_node(),
+
+            // Continue statement
             (TokenKind::KwCONTINUE, _) => self.continue_node(),
+
+            // Match statement
             (TokenKind::KwMATCH, _) => self.match_node(),
+
+            // Try statement
             (TokenKind::KwTRY, _) => self.try_node(),
+
+            // Throw statement
             (TokenKind::KwTHROW, _) => self.throw_node(),
+
+            // Import statement
             (TokenKind::KwUSING, _) => self.using_node(),
+
+            // Expression
             _ => self.expr(),
         }
     }
 
+    /// Assign an expression result to an identifier
     fn assign_expr(&mut self, ident: String) -> ParserResult {
         let line = self.current_token.line;
         self.advance(); // skip ident
-        let op = self.current_token.kind.clone();
-        self.advance();
-        self.skip_newlines();
+        let op = self.current_token.kind.clone(); // The reassignment operator
+        self.advance(); // skip the reassignment operator
+        self.skip_newlines(); // allow for newlines after the reassignment operator
         let expr = self.expr()?;
         Ok(Node::new(
             NodeKind::Assign {
@@ -114,6 +163,8 @@ impl Parser {
 
     fn expr(&mut self) -> ParserResult {
         let line = self.current_token.line;
+
+        // And or
         let expr = self.bin_op(
             Parser::comparison_expr,
             Parser::comparison_expr,
@@ -123,13 +174,14 @@ impl Parser {
             return Ok(expr);
         }
 
+        // we are looking at the conditional assignment
         self.advance(); // skip '?'
         self.skip_newlines();
         let true_expr = self.expr()?;
         self.skip_newlines();
         self.check_token_kind(
             TokenKind::KwELSE,
-            format!("Expected {} in conditional expression", TokenKind::KwELSE),
+            format!("Expected {} in conditional assignment", TokenKind::KwELSE),
         )?;
         self.skip_newlines();
         let false_expr = self.expr()?;
@@ -143,6 +195,7 @@ impl Parser {
         ))
     }
 
+    // Not token or > >= < <= = != in
     fn comparison_expr(&mut self) -> ParserResult {
         match self.current_token.kind {
             TokenKind::KwNOT => {
@@ -173,6 +226,7 @@ impl Parser {
         }
     }
 
+    /// + -
     fn plus_minus_expr(&mut self) -> ParserResult {
         self.bin_op(
             Parser::mul_div_mod_expr,
@@ -181,6 +235,7 @@ impl Parser {
         )
     }
 
+    /// * / %
     fn mul_div_mod_expr(&mut self) -> ParserResult {
         self.bin_op(
             Parser::unary_expr,
@@ -189,6 +244,7 @@ impl Parser {
         )
     }
 
+    /// Something like -----1 or +++++1
     fn unary_expr(&mut self) -> ParserResult {
         match self.current_token.kind.clone() {
             op @ (TokenKind::Plus | TokenKind::Minus) => {
@@ -207,10 +263,12 @@ impl Parser {
         }
     }
 
+    // Power token ^
     fn power_expr(&mut self) -> ParserResult {
         self.bin_op(Parser::call_expr, Parser::unary_expr, &[TokenKind::Pow])
     }
 
+    // Call expression (like println())
     fn call_expr(&mut self) -> ParserResult {
         let line = self.current_token.line;
         let expr = self.atom_expr()?;
@@ -256,6 +314,7 @@ impl Parser {
         ))
     }
 
+    // The most basic of the expressions
     fn atom_expr(&mut self) -> ParserResult {
         let line = self.current_token.line;
         match self.current_token.kind.clone() {
@@ -303,15 +362,17 @@ impl Parser {
         }
     }
 
+    /// Access an identifier or a type
     fn ident_node(&mut self, ident: String) -> ParserResult {
         let line = self.current_token.line;
         self.advance();
         match Type::try_from(ident.as_str()) {
             Ok(inner) => Ok(Node::new(NodeKind::Type { inner }, line)),
-            _ => Ok(Node::new(NodeKind::Ident { ident }, line)),
+            Err(()) => Ok(Node::new(NodeKind::Ident { ident }, line)),
         }
     }
 
+    /// An expression surrounded by round brackets
     fn round_brackets_expr(&mut self) -> ParserResult {
         self.advance(); // skip '('
         self.skip_newlines();
@@ -327,6 +388,7 @@ impl Parser {
         Ok(expr)
     }
 
+    /// Vector declaration with the square bracket syntax
     fn vector_node(&mut self) -> ParserResult {
         let line = self.current_token.line;
         self.advance(); // skip '['
@@ -403,6 +465,7 @@ impl Parser {
         }
     }
 
+    // Condition and body of an 'if else' statement
     fn get_condition_and_body(&mut self) -> Result<(Option<Node>, Vec<Node>), Error> {
         let condition = Some(self.expr()?);
         self.check_token_kind(TokenKind::KwDO, format!("Expected {}", TokenKind::KwDO))?;
@@ -416,6 +479,8 @@ impl Parser {
         }
     }
 
+    /// Return the identifier of a for or foreach loop, or None if the identifier is
+    /// the special case '_'
     fn get_for_loop_ident(&mut self) -> Result<Option<String>, Error> {
         let TokenKind::Ident(ident) = self.current_token.kind.clone() else {
             return Err(Error::syntax(
@@ -435,10 +500,11 @@ impl Parser {
         }
     }
 
+    /// Get the start value of the for loop
     fn get_for_loop_start(&mut self) -> Result<Option<Node>, Error> {
         match self.current_token.kind {
             TokenKind::Assign => {
-                self.advance(); // skip 'from'
+                self.advance(); // skip '::'
                 Ok(Some(self.expr()?))
             }
             TokenKind::ThickArrow => Ok(None),
@@ -454,10 +520,11 @@ impl Parser {
         }
     }
 
+    /// Ge the end value of a for loop
     fn get_for_loop_end(&mut self) -> ParserResult {
         match self.current_token.kind {
             TokenKind::ThickArrow => {
-                self.advance(); // skip 'to'
+                self.advance(); // skip '=>'
                 self.expr()
             }
             _ => Err(Error::syntax(
@@ -471,10 +538,11 @@ impl Parser {
         }
     }
 
+    /// Get step value of the for loop
     fn get_for_loop_step(&mut self) -> Result<Option<Node>, Error> {
         match self.current_token.kind {
             TokenKind::Comma => {
-                self.advance();
+                self.advance(); // skip ','
                 Ok(Some(self.expr()?))
             }
             _ => Ok(None),
@@ -529,6 +597,8 @@ impl Parser {
         self.advance(); // skip 'while'
         let condition = self.expr()?;
         let body = self.get_loop_body()?;
+
+        // Special case if the only condition is the true keyword
         let kind = if condition.kind == NodeKind::True {
             NodeKind::InfiniteLoop { body }
         } else {
@@ -544,24 +614,22 @@ impl Parser {
         let line = self.current_token.line;
         self.advance(); // skip 'fun'
         if self.current_token.kind == TokenKind::LeftRoundBracket {
-            return self.anonymous_fun_node();
+            return self.anonymous_fun_node(); // This is an expression
         }
-        let fun_name = match self.current_token.kind.clone() {
-            TokenKind::Ident(ident) => {
-                self.advance(); // skip identifier
-                ident
-            }
-            _ => {
-                return Err(Error::syntax(
-                    format!(
-                        "Expected identifier as function name, got {}",
-                        self.current_token
-                    ),
-                    self.ctx.set_line(self.current_token.line),
-                ))
-            }
+
+        // Get identifier of the function
+        let TokenKind::Ident(fun_name) = self.current_token.kind.clone() else {
+            return Err(Error::syntax(
+                format!(
+                    "Expected identifier as function name, got {}",
+                    self.current_token
+                ),
+                self.ctx.set_line(self.current_token.line),
+            ));
         };
-        let arg_names = self.get_fun_args(&fun_name)?;
+        self.advance(); // skip ident
+
+        let arg_names = self.get_fun_params(&fun_name)?;
         let body = self.get_fun_body()?;
         Ok(Node::new(
             NodeKind::Fun {
@@ -573,26 +641,26 @@ impl Parser {
         ))
     }
 
-    fn get_fun_args(&mut self, fun_name: &str) -> Result<Vec<String>, Error> {
+    fn get_fun_params(&mut self, fun_name: &str) -> Result<Vec<String>, Error> {
         let line = self.current_token.line;
         self.check_token_kind(
             TokenKind::LeftRoundBracket,
             format!("Expected {}", TokenKind::LeftRoundBracket),
         )?;
         self.skip_newlines();
-        let mut args = Vec::new();
+        let mut params = Vec::new();
         while self.current_token.kind != TokenKind::RightRoundBracket {
             match (self.current_token.kind.clone(), self.peek_token_kind()) {
                 (TokenKind::Ident(ident), Some(TokenKind::Comma)) => {
                     self.advance();
                     self.advance();
                     self.skip_newlines();
-                    args.push(ident);
+                    params.push(ident);
                 }
                 (TokenKind::Ident(ident), Some(TokenKind::RightRoundBracket)) => {
                     self.advance();
                     // newlines will be skipped in the body beginning
-                    args.push(ident);
+                    params.push(ident);
                 }
                 /*
                     Enable both these pattern
@@ -614,7 +682,7 @@ impl Parser {
                     self.advance(); // skip ident
                     self.advance(); // skip newline
                     self.skip_newlines();
-                    args.push(ident);
+                    params.push(ident);
                     if self.current_token.kind != TokenKind::RightRoundBracket {
                         return Err(Error::syntax(
                             format!(
@@ -640,15 +708,17 @@ impl Parser {
         }
         self.advance(); // skip ')'
 
-        let unique_args = args.iter().collect::<HashSet<_>>();
-        if args.len() == unique_args.len() {
-            return Ok(args);
+        // Check if parameters have different names
+        let unique_params = params.iter().collect::<HashSet<_>>();
+        if params.len() == unique_params.len() {
+            return Ok(params);
         }
 
-        let duplicates = args
+        // Else, get the non unique parameters and return an error
+        let duplicates = params
             .iter()
             .filter(|name| {
-                let count = args.iter().filter(|item| item == name).count();
+                let count = params.iter().filter(|item| item == name).count();
                 count > 1 // Get the arg names that occur more than once in the fun parameters
             })
             .collect::<HashSet<_>>() // Remove the string duplicates
@@ -667,8 +737,9 @@ impl Parser {
 
     fn anonymous_fun_node(&mut self) -> ParserResult {
         let line_start = self.current_token.line;
-        let arg_names = self.get_fun_args(&Type::AnonymousFun.to_string())?;
+        let arg_names = self.get_fun_params(&Type::AnonymousFun.to_string())?;
         match self.current_token.kind {
+            // Single return expression
             TokenKind::ThickArrow => {
                 self.advance();
                 let expr = self.get_fun_single_expr()?;
@@ -788,9 +859,13 @@ impl Parser {
     fn match_node(&mut self) -> ParserResult {
         let line = self.current_token.line;
         self.advance(); // skip 'match'
-        let input = self.expr()?;
+        let input = self.expr()?; // The expression to be matched
         self.check_token_kind(TokenKind::KwDO, format!("Expected {}", TokenKind::KwDO))?;
         self.skip_newlines();
+
+        // Each branch has a (possible) number of options (if none, its the default case),
+        // an optional guard and a vector of nodes, which is the body if the branch gets
+        // executed
         let mut branches = Vec::new();
 
         while self.current_token.kind != TokenKind::KwEND {
@@ -818,6 +893,8 @@ impl Parser {
     fn get_match_patterns(&mut self) -> Result<(Vec<Node>, Option<Node>), Error> {
         let mut patters = Vec::new();
         patters.push(self.expr()?);
+
+        // Patterns are comma separated
         while self.current_token.kind == TokenKind::Comma {
             self.advance();
             self.skip_newlines();
@@ -867,6 +944,8 @@ impl Parser {
         let try_nodes = if self.current_token.kind == TokenKind::KwCATCH {
             Vec::new()
         } else {
+            // We must have a catch block after a try block
+            // On the other hand, the else block is optional
             self.nodes(&[TokenKind::KwCATCH])?
         };
         let catch_blocks = self.get_catch_blocks()?;
@@ -900,7 +979,12 @@ impl Parser {
         let mut catch_blocks = CatchBlocks::new();
         while self.current_token.kind == TokenKind::KwCATCH {
             self.advance();
+
+            // The optional error alias
             let err_alias = self.get_err_alias()?;
+
+            // If there is an error alias, then there has to be at least one
+            // error to catch
             let at_least_one_err = err_alias.is_some();
             let err_names = self.get_err_names(at_least_one_err)?;
             self.check_token_kind(TokenKind::KwDO, format!("Expected {}", TokenKind::KwDO))?;
@@ -923,6 +1007,8 @@ impl Parser {
         }
     }
 
+    /// Return the error names that will be caught in the catch block
+    /// If None, all the errors will be caught
     fn get_err_names(&mut self, at_least_one_err: bool) -> Result<Option<Vec<ErrorKind>>, Error> {
         let line = self.current_token.line;
         let mut err_names = Vec::new();
@@ -958,10 +1044,10 @@ impl Parser {
                     self.ctx.set_line(line),
                 ))
             } else {
-                Ok(None)
+                Ok(None) // All errors will be caught
             }
         } else {
-            Ok(Some(err_names))
+            Ok(Some(err_names)) // Only these errors will be caught
         }
     }
 
@@ -986,7 +1072,7 @@ impl Parser {
                 self.advance(); // skip 'end'
                 Ok(None)
             }
-            _ => unreachable!(), // Guarded by self.get_catch_statements
+            _ => unreachable!(), // Guarded by self.get_catch_nodes
         }
     }
 
@@ -998,13 +1084,16 @@ impl Parser {
             .map_err(|(kind, msg)| Error::new(kind, msg, self.ctx.set_line(line)))?;
 
         let err_msg = if self.current_token.kind == TokenKind::LeftRoundBracket {
-            self.advance();
+            self.advance(); // skip '('
             self.skip_newlines();
             let err_msg = self.expr()?;
             self.skip_newlines();
             self.check_token_kind(
                 TokenKind::RightRoundBracket,
-                format!("Expected {}", TokenKind::RightRoundBracket),
+                format!(
+                    "Expected {} in throw statement",
+                    TokenKind::RightRoundBracket
+                ),
             )?;
             Some(err_msg)
         } else {
@@ -1025,6 +1114,8 @@ impl Parser {
         self.skip_newlines();
 
         let relative_imports = if let TokenKind::Ident(ident) = self.current_token.kind.clone() {
+            // If an identifier follows the 'using' keyword, it means that we want
+            // to perform a relative import of identifiers
             self.advance(); // skip ident
             let mut relative_imports = Vec::new();
             let alias = self.get_import_alias()?;
@@ -1044,10 +1135,11 @@ impl Parser {
             }
             Some(relative_imports)
         } else {
-            None
+            None // Absolute import
         };
 
         if relative_imports.is_some() {
+            // We then must have the 'in <path>' structure
             self.skip_newlines();
             self.check_token_kind(TokenKind::KwIN, format!("Expected {}", TokenKind::KwIN))?;
         }
@@ -1061,7 +1153,7 @@ impl Parser {
             return Err(Error::syntax(msg, self.ctx.set_line(line)));
         };
 
-        self.advance();
+        self.advance(); // skip the path
         let mut path = PathBuf::from(path);
         if path.extension().is_none() {
             path.set_extension("betty");
@@ -1080,7 +1172,7 @@ impl Parser {
 
     fn get_import_alias(&mut self) -> Result<Option<String>, Error> {
         if self.current_token.kind != TokenKind::KwAS {
-            return Ok(None);
+            return Ok(None); // No import alias, import the name as it is
         }
 
         self.advance(); // skip 'as'
@@ -1095,6 +1187,8 @@ impl Parser {
         Ok(Some(alias))
     }
 
+    /// Check whether the current token is of the kind provided. If yes, skip it,
+    /// otherwise return an error with the message provided
     fn check_token_kind(&mut self, kind: TokenKind, msg: String) -> Result<(), Error> {
         if self.current_token.kind != kind {
             Err(Error::syntax(
@@ -1107,6 +1201,8 @@ impl Parser {
         }
     }
 
+    /// Return a [`Vec`] of [`Node`]s, which is the body of a statement such as
+    /// a loop or an if or a function, for example
     fn get_body(&mut self) -> ParserResults {
         self.skip_newlines(); // idk if this is needed
         self.check_token_kind(TokenKind::KwDO, format!("Expected {}", TokenKind::KwDO))?;
@@ -1121,6 +1217,8 @@ impl Parser {
         }
     }
 
+    /// Perform a binary operation between the result of left and right,
+    /// using ops as operators
     fn bin_op(
         &mut self,
         left: fn(&mut Parser) -> ParserResult,
@@ -1132,7 +1230,7 @@ impl Parser {
         while ops.contains(&self.current_token.kind) {
             let op = self.current_token.kind.clone();
             self.advance(); // skip op
-            self.skip_newlines(); // Multiline bin op expressions
+                            // self.skip_newlines(); // Multiline bin op expressions
             let right = right(self)?;
             left = Node::new(
                 NodeKind::BinOp {
@@ -1146,15 +1244,16 @@ impl Parser {
         Ok(left)
     }
 
+    /// Build and return the ast, consuming the [`Parser`]
     pub fn parse(mut self) -> ParserResults {
-        let nodes = self.nodes(&[TokenKind::Eof])?;
+        let ast = self.nodes(&[TokenKind::Eof])?;
         if !self.tokens.is_empty() {
             Err(Error::syntax(
                 format!("Invalid syntax on {}", self.current_token),
                 self.ctx.set_line(self.current_token.line),
             ))
         } else {
-            Ok(nodes)
+            Ok(ast)
         }
     }
 }
