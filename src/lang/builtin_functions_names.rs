@@ -1,9 +1,9 @@
-// Stdin and stdout
+// Console stdin and stdout
 pub const BUILTIN_PRINT: &str = "print";
 pub const BUILTIN_PRINTLN: &str = "println";
 pub const BUILTIN_READ_LINE: &str = "read_line";
 
-// Parse
+// Parse values
 pub const BUILTIN_TO_INT: &str = "to_int";
 pub const BUILTIN_TO_FLOAT: &str = "to_float";
 pub const BUILTIN_TO_STR: &str = "to_str";
@@ -26,7 +26,7 @@ pub const BUILTIN_STR_IS_UPPERCASE: &str = "str_is_uppercase";
 pub const BUILTIN_STR_TO_LOWERCASE: &str = "str_to_lowercase";
 pub const BUILTIN_STR_TO_UPPERCASE: &str = "str_to_uppercase";
 
-// File
+// File IO
 pub const BUILTIN_FREAD: &str = "fread";
 pub const BUILTIN_FWRITE: &str = "fwrite";
 pub const BUILTIN_FAPPEND: &str = "fappend";
@@ -37,7 +37,7 @@ pub const BUILTIN_ERR_TRACEBACK: &str = "err_traceback";
 pub const BUILTIN_ERR_LINE: &str = "err_line";
 pub const BUILTIN_ERR_KIND: &str = "err_kind";
 
-// Utilities
+// Misc
 pub const BUILTIN_ASSERT: &str = "assert";
 pub const BUILTIN_TYPEOF: &str = "typeof";
 

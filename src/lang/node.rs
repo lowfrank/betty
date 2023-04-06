@@ -1,3 +1,5 @@
+//! The [`Node`] struct represents a component of the AST.
+
 use std::path::PathBuf;
 
 use super::error::ErrorKind;
@@ -17,6 +19,7 @@ impl Node {
     }
 }
 
+/// The kind of a [`Node`] is a [`NodeKind`]
 #[derive(Clone, PartialEq, Debug)]
 pub enum NodeKind {
     Int {
@@ -104,7 +107,6 @@ pub enum NodeKind {
     Type {
         inner: Type,
     },
-    // About 25% faster than a while loop with a condition always true
     InfiniteLoop {
         body: Vec<Node>,
     },
@@ -120,11 +122,14 @@ pub enum NodeKind {
     },
 }
 
+/// The [`CatchBlocks`] struct handles the catch statements
 #[derive(Clone, PartialEq, Debug, Default)]
 pub struct CatchBlocks {
     pub err_kinds: Vec<Option<Vec<ErrorKind>>>,
     pub err_aliases: Vec<Option<String>>,
-    pub catch_nodes: Vec<Vec<Node>>, // Multiple catch nodes
+
+    // Multiple catch nodes, each catch node has its own statements
+    pub catch_nodes: Vec<Vec<Node>>,
 }
 
 impl CatchBlocks {
@@ -132,6 +137,7 @@ impl CatchBlocks {
         Default::default()
     }
 
+    /// Push a new catch block at the end of the stack
     pub fn push_block(
         &mut self,
         err_kinds: Option<Vec<ErrorKind>>,
@@ -143,9 +149,13 @@ impl CatchBlocks {
         self.catch_nodes.push(nodes);
     }
 
+    /// Get the i-th catch block
     fn get(&mut self, i: usize) -> Option<(Option<String>, Vec<Node>)> {
         Some((self.err_aliases.remove(i), self.catch_nodes.remove(i)))
     }
+
+    /// Try tp catch 'err_kind' by iterating over its errors. If it contains the error,
+    /// it is caught??? I can't remember it now
     pub fn try_catch(&mut self, err_kind: ErrorKind) -> Option<(Option<String>, Vec<Node>)> {
         for (i, err_kinds) in self.err_kinds.iter().enumerate() {
             let Some(err_kinds) = err_kinds else {
@@ -156,23 +166,5 @@ impl CatchBlocks {
             }
         }
         None
-    }
-}
-
-impl IntoIterator for CatchBlocks {
-    type Item = ((Option<Vec<ErrorKind>>, Option<String>), Vec<Node>);
-    type IntoIter = std::iter::Zip<
-        std::iter::Zip<
-            std::vec::IntoIter<Option<Vec<ErrorKind>>>,
-            std::vec::IntoIter<Option<String>>,
-        >,
-        std::vec::IntoIter<Vec<Node>>,
-    >;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.err_kinds
-            .into_iter()
-            .zip(self.err_aliases)
-            .zip(self.catch_nodes)
     }
 }
