@@ -1,3 +1,6 @@
+//! An [`Error`] is composed of a message, a kind ([`ErrorKind`]) and a context ([`Ctx`]),
+//! which represents the traceback.
+
 use std::convert::From;
 use std::fmt;
 use std::path::PathBuf;
@@ -6,10 +9,12 @@ use super::object::Object;
 use super::token::TokenKind;
 use super::type_alias::Line;
 
+/// This character is used to replace filenames that are non valid UTF-8
 const DECODING_ERROR_CHARACTER: char = char::REPLACEMENT_CHARACTER;
 
 #[derive(Default, Clone, Debug)]
 pub struct Ctx {
+    // If there is no filename, then we are in the repl
     pub filename: Option<PathBuf>,
     pub fun_name: Option<String>,
     pub line: Line,
@@ -52,6 +57,7 @@ impl Ctx {
         }
     }
 
+    /// This function creates the full traceback and returns it as [`String`]
     pub fn build_report(&self, tail: String) -> String {
         let mut report = tail;
         report = self.push_report_stack(report);
@@ -79,7 +85,7 @@ impl Ctx {
 
 #[derive(Debug, PartialEq, Clone, Eq)]
 pub enum ErrorKind {
-    Syntax, // Uncatchable
+    Syntax, // Uncatchable, not a RuntimeError
     Value,
     Type,
     UnknownIdentifier,
@@ -91,7 +97,7 @@ pub enum ErrorKind {
     Assertion,
     VectorMutation,
     ModuleImport,
-    Custom(String),
+    Custom(String), // User defined errors with newerror statement
 }
 
 impl fmt::Display for ErrorKind {
@@ -118,7 +124,7 @@ impl fmt::Display for Error {
 
 impl PartialEq for Error {
     fn eq(&self, other: &Self) -> bool {
-        self.kind == other.kind && self.msg == other.msg // TODO: What about ctx?
+        self.kind == other.kind
     }
 }
 
@@ -144,15 +150,18 @@ impl Error {
         }
     }
 
+    /// Shorthand to declare a SyntaxError
     pub fn syntax(msg: impl Into<String>, ctx: Ctx) -> Self {
         Self::new(ErrorKind::Syntax, Some(msg), Some(ctx))
     }
 
+    /// Shorthand to declare a ValueError
     pub fn value(msg: impl Into<String>, ctx: Ctx) -> Self {
         Self::new(ErrorKind::Value, Some(msg), Some(ctx))
     }
 
     fn make_report(&self) -> String {
+        // If there is no context, then just return the short message
         let Some(ctx) = &self.ctx else {
             return self.short_msg();
         };
@@ -161,8 +170,10 @@ impl Error {
     }
 
     pub fn short_msg(&self) -> String {
+        // If there is a message and it is not empty, then display it
+        // Otherwise, the message type is enough
         match &self.msg {
-            Some(msg) if !msg.is_empty() => format!("{}: {}", self.kind, msg),
+            Some(msg) => format!("{}: {}", self.kind, msg),
             _ => format!("{}", self.kind),
         }
     }
@@ -172,8 +183,14 @@ impl Error {
     }
 }
 
+/// A [`CFError`] is like an [`Error`], but it does not have the context field.
+/// It is only used in situations where there is no context, like adding or
+/// subtracting values, or executing a builtin function.
+/// The Interpreter will take care of converting a [`CFError`] into a [`Error`],
+/// because the Interpreter does have a context.
 pub struct CFError(pub ErrorKind, pub String);
 
+/// Message to display when an invalid operand has been used between left and right
 pub fn invalid_op_err_msg(left: Object, op: TokenKind, right: Object) -> String {
     format!(
         "Cannot apply {} to {} and {}",
@@ -183,6 +200,8 @@ pub fn invalid_op_err_msg(left: Object, op: TokenKind, right: Object) -> String 
     )
 }
 
+/// Message to display when a builtin function expected the nth argument
+/// to be of a certain type, while we received a different type
 pub fn expected_value_err_msg(
     what: impl Into<String>,
     nth: u8,

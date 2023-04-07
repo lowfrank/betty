@@ -1,3 +1,6 @@
+//! The [`Namespace`] provides the correlation identifier - value which is needed
+//! in order to store variables in memory.
+
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -21,6 +24,8 @@ impl Namespace {
         }))
     }
 
+    /// Retrieve an identifier from the namespace. If it is not found, go look for
+    /// it in the parent namespace
     #[inline]
     pub fn get(&self, ident: &str) -> CFResult {
         match self.inner.get(ident) {
@@ -35,19 +40,10 @@ impl Namespace {
         }
     }
 
+    /// Add an identifier to the namespace
     #[inline]
     pub fn add(&mut self, ident: String, value: Object) {
         self.inner.insert(ident, value);
-    }
-}
-
-impl IntoIterator for Namespace {
-    type Item = (String, Object);
-    type IntoIter = std::collections::hash_map::IntoIter<String, Object>;
-
-    #[inline]
-    fn into_iter(self) -> Self::IntoIter {
-        self.inner.into_iter()
     }
 }
 
@@ -61,6 +57,7 @@ impl From<&Rc<RefCell<Namespace>>> for Namespace {
     }
 }
 
+/// Convenience wrapper for the namespace, which is behind a Rc RefCell
 pub trait NamespaceWrapper {
     fn get(&self, ident: &str) -> CFResult;
     fn add(&mut self, ident: impl Into<String>, value: Object);
@@ -80,6 +77,7 @@ impl NamespaceWrapper for Rc<RefCell<Namespace>> {
     }
 }
 
+/// Default namespace
 #[inline]
 fn populate_namespace() -> HashMap<String, Object> {
     HashMap::from([

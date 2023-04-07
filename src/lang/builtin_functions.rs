@@ -11,7 +11,8 @@ use super::object::Object;
 use super::typ::Type;
 use super::type_alias::{CFResult, Float, FunArgs, Int};
 
-// Sync is required by lazy_static
+// Sync is required by lazy_static, otherwise the following error shows up
+// (dyn builtin_functions::BuiltinFn + 'static)` cannot be shared between threads safely
 pub trait BuiltinFn: Sync {
     fn call(&self, args: FunArgs) -> CFResult;
 }
@@ -92,6 +93,7 @@ fn check_vfrom_range_args(start: Int, end: Int, step: Int) -> Result<(), CFError
     Ok(())
 }
 
+#[inline]
 fn check_slice_args(start: Int, end: Int, len: usize) -> Result<(), CFError> {
     if end < 0 || end > (len - 1) as Int {
         return Err(CFError(

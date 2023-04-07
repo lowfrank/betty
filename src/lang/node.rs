@@ -47,6 +47,9 @@ pub enum NodeKind {
     True,
     False,
     Nothing,
+
+    // Option<Node> is the condition: if None, it's the 'else' case
+    // Vec<Node> is the body that will be executed if the condition evaluates to true
     If {
         cases: Vec<(Option<Node>, Vec<Node>)>,
     },
@@ -86,10 +89,17 @@ pub enum NodeKind {
     Continue,
     Match {
         input: Box<Node>,
+        // Option<Vec<Node>> is one pattern, which can have multiple values to match to
+        // If None, it is the 'else' case
+        // Option<Node> is the guard
+        // Vec<Node> is the body
         branches: Vec<(Option<Vec<Node>>, Option<Node>, Vec<Node>)>,
     },
     Try {
         try_nodes: Vec<Node>,
+        // Option<Vec<Node>> is the sequence of catchable errors. If None, it's the 'all' case
+        // Option<String> is the name alias to bind the error to
+        // Vec<Node> is the body
         catch_blocks: Vec<(Option<Vec<Node>>, Option<String>, Vec<Node>)>,
         else_nodes: Option<Vec<Node>>,
     },

@@ -6,7 +6,7 @@ edition = "2021"
 authors = ["Francesco Basso fra2000.basso@gmail.com"]
 description = """
 betty is a general purpose programming language.
-It is high level, functional and dynamically typed."""
+It is defined as high level, functional and dynamically typed."""
 
 [package.metadata]
 credits = ["Alessandro Bongiovanni", "Matteo Penasso"]

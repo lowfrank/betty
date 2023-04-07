@@ -1,3 +1,5 @@
+//! The [`Interpreter`] is responsible for the evaluation of the AST
+
 use std::cell::RefCell;
 use std::collections::VecDeque;
 use std::path::PathBuf;
@@ -11,7 +13,7 @@ use super::token::TokenKind;
 use super::typ::Type;
 use super::type_alias::{CFResult, Int, InterpreterResult, Line};
 
-macro_rules! check_state {
+macro_rules! check_loop_state {
     ($self:ident, $return_expr:expr) => {{
         if let Some(state) = $self.state {
             match state {
@@ -26,17 +28,27 @@ macro_rules! check_state {
     }};
 }
 
-#[derive(PartialEq, Eq, Copy, Clone, Debug)]
+#[derive(PartialEq, Eq, Copy, Clone)]
 pub enum State {
+    /// The program must return from the current function
     Return,
+
+    /// The program must skip the rest of the body of the loop and start from the
+    /// top of it
     Continue,
+
+    /// The program must break out of the loop
     Break,
 }
 
-#[derive(Debug)]
 pub struct Interpreter {
     pub namespace: Rc<RefCell<Namespace>>,
+
+    /// If there is some state, then the interpreter must address that.
+    /// The program state is checked after every statement.
     pub state: Option<State>,
+
+    /// The program context, which holds the filename, the error line (if any), etc.
     pub ctx: Ctx,
 }
 
@@ -88,6 +100,7 @@ impl Interpreter {
         self
     }
 
+    /// Visit multiple statements
     #[inline]
     pub fn visit_multiple(&mut self, nodes: Vec<Node>) -> InterpreterResult {
         for node in nodes {
@@ -104,6 +117,7 @@ impl Interpreter {
         Ok(Object::Nothing)
     }
 
+    /// Visit a single statement
     #[inline]
     pub fn visit(&mut self, node: Node) -> InterpreterResult {
         match node.kind {
@@ -170,12 +184,14 @@ impl Interpreter {
         }
     }
 
+    /// Set the state of the program to a new state
     #[inline]
     fn set_state(&mut self, state: State) -> InterpreterResult {
         self.state = Some(state);
         Ok(Object::Nothing)
     }
 
+    /// Create a new function object and inserts it into the namespace
     #[inline]
     fn visit_fun_node(
         &mut self,
@@ -188,6 +204,7 @@ impl Interpreter {
         Ok(Object::Nothing)
     }
 
+    /// Create a new Vector object
     #[inline]
     fn visit_vector_node(&mut self, nodes: Vec<Node>) -> InterpreterResult {
         let v = nodes
@@ -198,6 +215,7 @@ impl Interpreter {
         Ok(Object::Vector(Rc::new(RefCell::new(v))))
     }
 
+    /// Visit a binary operation node (left, op, right)
     #[inline]
     fn visit_bin_op_node(
         &mut self,
@@ -230,6 +248,9 @@ impl Interpreter {
             TokenKind::KwAND => left.and(right),
             TokenKind::KwOR => left.or(right),
             TokenKind::KwIN => left.contains(right),
+
+            // We know from the parser that this is unreachable
+            // The only TokenKinds used in binary operations are the ones above
             _ => unreachable!(),
         }
     }
@@ -251,6 +272,7 @@ impl Interpreter {
         }
     }
 
+    /// Search for an identifier in the namespace
     #[inline]
     fn visit_ident_node(&mut self, ident: String, line: Line) -> InterpreterResult {
         self.namespace
@@ -258,6 +280,7 @@ impl Interpreter {
             .map_err(|err| Error::from((err, self.ctx.set_line(line))))
     }
 
+    /// Assign or reassign operation
     #[inline]
     fn visit_assign_node(
         &mut self,
@@ -319,6 +342,7 @@ impl Interpreter {
     ) -> InterpreterResult {
         for (condition, nodes) in cases {
             let should_exec = match condition {
+                // Condition must be a bool
                 Some(node) => bool::try_from(self.visit(node)?)
                     .map_err(|err| Error::from((err, self.ctx.set_line(line))))?,
                 None => true, // 'else' statement
@@ -342,6 +366,7 @@ impl Interpreter {
         line: Line,
     ) -> InterpreterResult {
         loop {
+            // Condition must be a bool
             let should_execute = bool::try_from(self.visit(condition.clone())?)
                 .map_err(|err| Error::from((err, self.ctx.set_line(line))))?;
 
@@ -349,7 +374,7 @@ impl Interpreter {
                 break;
             }
             let expr = self.visit_multiple(body.clone())?;
-            check_state!(self, expr);
+            check_loop_state!(self, expr);
         }
         Ok(Object::Nothing)
     }
@@ -448,7 +473,7 @@ impl Interpreter {
             self.namespace
                 .add(ident.clone(), Object::String(String::from(ch)));
             let expr = self.visit_multiple(body.clone())?;
-            check_state!(self, expr);
+            check_loop_state!(self, expr);
         }
         Ok(Object::Nothing)
     }
@@ -457,7 +482,7 @@ impl Interpreter {
     fn foreach_string(&mut self, s: String, body: Vec<Node>) -> InterpreterResult {
         for _ in s.chars() {
             let expr = self.visit_multiple(body.clone())?;
-            check_state!(self, expr);
+            check_loop_state!(self, expr);
         }
         Ok(Object::Nothing)
     }
@@ -473,7 +498,7 @@ impl Interpreter {
             let item = item.duplicate();
             self.namespace.add(&ident, item);
             let expr = self.visit_multiple(body.clone())?;
-            check_state!(self, expr);
+            check_loop_state!(self, expr);
         }
         Ok(Object::Nothing)
     }
@@ -482,7 +507,7 @@ impl Interpreter {
     fn foreach_vector(&mut self, v: &[Object], body: Vec<Node>) -> InterpreterResult {
         for _ in v {
             let expr = self.visit_multiple(body.clone())?;
-            check_state!(self, expr);
+            check_loop_state!(self, expr);
         }
         Ok(Object::Nothing)
     }
@@ -498,6 +523,7 @@ impl Interpreter {
 
         match obj {
             Object::Fun(func_name, arg_names, body) => {
+                // Create a child namespace and insert the function arguments into it
                 let mut namespace = Namespace::from(&self.namespace);
                 self.setup_function(args, arg_names, Some(&func_name), line, &mut namespace)?;
                 let ctx = self.ctx.set_line(line); // Already clones it
@@ -572,11 +598,11 @@ impl Interpreter {
         Ok(Object::Nothing)
     }
 
-    #[inline]
     /// Return true if the guard check was passed
+    #[inline]
     fn check_match_guard(&mut self, guard: Option<Node>) -> Result<bool, Error> {
         let Some(guard) = guard else {
-            return Ok(true);
+            return Ok(true);  // No guard
         };
 
         let line = guard.line;
@@ -591,7 +617,7 @@ impl Interpreter {
         catch_blocks: Vec<(Option<Vec<Node>>, Option<String>, Vec<Node>)>,
         else_nodes: Option<Vec<Node>>,
     ) -> InterpreterResult {
-        let mut exec_err = None;
+        let mut exec_err = None; // The execution error
         let mut err_alias = None;
         let mut catch_body = Vec::new();
 
@@ -622,7 +648,7 @@ impl Interpreter {
                             let Object::Error(catchable_error) = catchable_error else {
                                 return Err(Error::value(format!("Expected {} in catch statement, got {}", Type::Error, catchable_error), self.ctx.set_line(line)));
                             };
-                            if catchable_error.kind == err.kind {
+                            if catchable_error == err {
                                 // Caught!
                                 exec_err = Some(err);
                                 err_alias = alias;
@@ -637,14 +663,17 @@ impl Interpreter {
             }
         }
 
+        // If an error passed through
         if let Some(err) = exec_err {
             if let Some(err_alias) = err_alias {
+                // Bind the alias to the error
                 self.namespace.add(err_alias, Object::Error(err));
             }
             let expr = self.visit_multiple(catch_body)?;
             if let Some(State::Return) = self.state {
                 return Ok(expr);
             }
+        // If there are 'else' statements
         } else if let Some(else_nodes) = else_nodes {
             let expr = self.visit_multiple(else_nodes)?;
             if let Some(State::Return) = self.state {
@@ -672,6 +701,8 @@ impl Interpreter {
             .namespace
             .get(&err)
             .map_err(|err| Error::from((err, self.ctx.set_line(line))))?;
+
+        // The identifier must be an Error
         let Object::Error(err) = err else {
             return Err(Error::value(format!("Expected {} in throw statement, got {}", Type::Error, err.kind()), self.ctx.set_line(line)));
         };
@@ -680,22 +711,18 @@ impl Interpreter {
             Some(node) => {
                 let result = self.visit(node)?;
                 // Otherwise the expr does not live long enough
-                result.to_string()
+                Some(result.to_string())
             }
-            None => String::new(),
+            None => None,
         };
-        Err(Error::new(
-            err.kind,
-            Some(msg),
-            Some(self.ctx.set_line(line)),
-        ))
+        Err(Error::new(err.kind, msg, Some(self.ctx.set_line(line))))
     }
 
     #[inline]
     fn visit_infinite_loop(&mut self, body: Vec<Node>) -> InterpreterResult {
         loop {
             let expr = self.visit_multiple(body.clone())?;
-            check_state!(self, expr)
+            check_loop_state!(self, expr)
         }
         Ok(Object::Nothing)
     }
@@ -711,6 +738,7 @@ impl Interpreter {
         if let Some(relative_imports) = relative_imports {
             return self.visit_using_relative_imports(nodes, path, relative_imports, line);
         }
+        // Otherwise, visit all the identifiers in the path
         Interpreter::new(Rc::clone(&self.namespace))
             .filename(path)
             .parent(Box::new(self.ctx.set_line(line)))
@@ -741,6 +769,8 @@ impl Interpreter {
                 .parent(Box::new(self.ctx.set_line(line)));
         interpreter.visit_multiple(nodes)?;
 
+        // We know this is a safe unwrap, because at the end we will be left with only
+        // one reference pointing to the Rc
         let namespace = Rc::try_unwrap(interpreter.namespace).unwrap().into_inner();
         for (import_name, alias) in relative_imports {
             let obj = namespace
@@ -752,6 +782,7 @@ impl Interpreter {
         Ok(Object::Nothing)
     }
 
+    /// Insert arguments into the namespace
     #[inline]
     fn setup_function(
         &mut self,
@@ -807,7 +838,7 @@ macro_rules! impl_for_loop {
 
                 while start $op end {
                     let expr = self.visit_multiple(body.clone())?;
-                    check_state!(self, expr);
+                    check_loop_state!(self, expr);
                     start += step;
                     self.namespace.add(&ident, Object::Int(start));
                 }
@@ -824,7 +855,7 @@ macro_rules! impl_for_loop {
             ) -> InterpreterResult {
                 while start $op end {
                     let expr = self.visit_multiple(body.clone())?;
-                    check_state!(self, expr);
+                    check_loop_state!(self, expr);
                     start += step;
                 }
                 Ok(Object::Nothing)

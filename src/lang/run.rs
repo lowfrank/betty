@@ -1,3 +1,5 @@
+//! A collection of structs and functions used to run betty REPL or a betty file
+
 use std::collections::VecDeque;
 use std::fmt;
 use std::fs;
@@ -7,7 +9,8 @@ use std::thread;
 use std::time;
 
 use clap::Parser as ClapParser;
-use device_query::{DeviceQuery, DeviceState, Keycode};
+use device_query::DeviceQuery;
+use device_query::{DeviceState, Keycode};
 
 use super::error::{Ctx, Error, ErrorKind};
 use super::interpreter::Interpreter;
@@ -17,9 +20,10 @@ use super::object::Object;
 use super::parser::Parser;
 use super::type_alias::ParserResults;
 
+/// If Ctrl+Z have been pressed, quit the repl
 const QUIT_KEYS: [Keycode; 2] = [Keycode::Z, Keycode::LControl];
-const MULTILINE_SEQUENCE_KEYS: [Keycode; 2] = [Keycode::Enter, Keycode::LShift];
 
+/// Spawn the main thread with the desired stack size
 macro_rules! main_thread {
     ($stack_size:expr, $block:block) => {
         thread::Builder::new()
@@ -32,6 +36,7 @@ macro_rules! main_thread {
     };
 }
 
+/// This struct represents the version of betty
 struct BettyVersion;
 
 impl BettyVersion {
@@ -40,6 +45,7 @@ impl BettyVersion {
     const MICRO: u16 = 0;
 }
 
+/// Nicely print the betty version in the repl
 impl fmt::Display for BettyVersion {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
@@ -47,21 +53,26 @@ impl fmt::Display for BettyVersion {
             "{}.{}.{}",
             BettyVersion::MAJOR,
             BettyVersion::MINOR,
-            BettyVersion::MICRO
+            BettyVersion::MICRO,
         )
     }
 }
 
+/// Cli application handler
 #[derive(ClapParser)]
 #[command(author, version, about)]
 pub struct CliParser {
+    /// Path of the betty file. If not provided, run repl console
     pub path: Option<String>,
 
-    #[arg(short, long, help = "Enable execution time tracking")]
+    /// Time
+    #[arg(short, long, help = "Time the program execution")]
     pub time: bool,
 
+    /// Additional args provided to the program
     pub args: Option<Vec<String>>,
 
+    /// Stack size
     #[arg(long, default_value_t = 2 * 1024 * 1024, help = "Allocate memory for the stack")]
     pub stack_size: usize,
 }
@@ -91,18 +102,22 @@ impl BettyFile {
         };
 
         main_thread!(self.stack_size, {
+            // Get source
             let source = match self.get_source() {
                 Ok(source) => source,
                 Err(err) => return eprintln!("{}", err),
             };
             let filename = PathBuf::from(self.filename);
+
+            // Lexer
             let tokens =
                 match Lexer::new(Some(filename.clone()), source.chars().collect()).make_tokens() {
                     Ok(Some(tokens)) => tokens,
-                    Ok(None) => return,
+                    Ok(None) => return, // No tokens emitted!
                     Err(err) => return eprintln!("{}", err),
                 };
 
+            // Parser
             let nodes = match Parser::new(VecDeque::from(tokens))
                 .filename(filename.clone())
                 .parse()
@@ -110,6 +125,8 @@ impl BettyFile {
                 Ok(nodes) => nodes,
                 Err(err) => return eprintln!("{}", err),
             };
+
+            // Interpreter
             if let Err(err) = Interpreter::new(Namespace::new())
                 .filename(filename)
                 .insert_args(self.args)
@@ -136,6 +153,7 @@ impl BettyFile {
         })
     }
 
+    /// Import a betty module into the program, return the nodes
     pub fn import_module(path: PathBuf, ctx: Ctx) -> ParserResults {
         let source = fs::read_to_string(&path).map_err(|err| {
             Error::new(
@@ -168,18 +186,16 @@ impl BettyRepl {
         }
     }
 
-    /// The REPL gets input as long as CTRL+Enter is not pressed,
-    /// to allow for multiline input by default
     pub fn run(self) {
         main_thread!(self.stack_size, {
             let mut interpreter = Interpreter::repl().insert_args(self.args);
             Self::print_version();
             loop {
                 let Some(source) = Self::get_source() else {
-                    println!();
                     return;  // quit keys have been pressed
                 };
 
+                // Lexer
                 let tokens = match Lexer::new(None, source.chars().collect()).make_tokens() {
                     Ok(Some(tokens)) => tokens,
                     Ok(None) => continue,
@@ -188,13 +204,18 @@ impl BettyRepl {
                         continue;
                     }
                 };
+
+                // Parser
                 let node = match Parser::new(VecDeque::from(tokens)).parse() {
+                    // There is only one node anyway
                     Ok(mut nodes) => nodes.remove(0),
                     Err(err) => {
                         eprintln!("{}", err);
                         continue;
                     }
                 };
+
+                // Interpreter
                 match interpreter.visit(node) {
                     Ok(result) => {
                         if result != Object::Nothing {
@@ -216,6 +237,9 @@ impl BettyRepl {
     fn get_source() -> Option<String> {
         let mut source = String::new();
         let keyboard = DeviceState::new();
+        if keyboard.get_keys() == QUIT_KEYS {
+            return None;
+        }
 
         print!(">>> ");
         io::stdout()
@@ -224,19 +248,6 @@ impl BettyRepl {
         io::stdin()
             .read_line(&mut source)
             .expect("Fatal internal error in reading stdin while getting repl source");
-
-        while keyboard.get_keys() != MULTILINE_SEQUENCE_KEYS {
-            if keyboard.get_keys() == QUIT_KEYS {
-                return None;
-            }
-            print!("... ");
-            io::stdout()
-                .flush()
-                .expect("Fatal internal error in flushing stdout while getting repl source");
-            io::stdin()
-                .read_line(&mut source)
-                .expect("Fatal internal error in reading stdin while getting repl source");
-        }
 
         if source.ends_with('\n') {
             source.pop();

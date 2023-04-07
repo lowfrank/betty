@@ -1,3 +1,5 @@
+//! betty's typing system, used in printing objects
+
 use std::fmt;
 
 #[derive(Clone, PartialEq, Debug, Eq)]

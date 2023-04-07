@@ -221,7 +221,7 @@ impl Object {
                 cmp::Ordering::Less => Err(CFError(
                     ErrorKind::Value,
                     format!(
-                        "Cannot multiply {} by negative {} '{}'",
+                        "Cannot multiply {} by negative {} {}",
                         Type::Vector,
                         Type::Int,
                         n
