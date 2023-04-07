@@ -5,7 +5,7 @@ use std::rc::Rc;
 
 use super::error::{Ctx, Error, ErrorKind};
 use super::namespace::{Namespace, NamespaceWrapper};
-use super::node::{CatchBlocks, Node, NodeKind};
+use super::node::{Node, NodeKind};
 use super::object::{call_anonymous_function, call_builtin_function, call_function, Object};
 use super::token::TokenKind;
 use super::typ::Type;
@@ -159,15 +159,14 @@ impl Interpreter {
                 true_node,
                 false_node,
             } => self.visit_conditional_expr(*condition, *true_node, *false_node, node.line),
-            NodeKind::Throw { err_kind, err_msg } => {
-                self.visit_throw_node(err_kind, *err_msg, node.line)
-            }
+            NodeKind::Throw { err, msg } => self.visit_throw_node(err, *msg, node.line),
             NodeKind::InfiniteLoop { body } => self.visit_infinite_loop(body),
             NodeKind::Using {
                 nodes,
                 path,
                 relative_imports,
             } => self.visit_using_node(nodes, path, relative_imports, node.line),
+            NodeKind::NewError { ident } => self.visit_newerror_node(ident),
         }
     }
 
@@ -428,7 +427,7 @@ impl Interpreter {
             },
             _ => Err(Error::value(
                 format!(
-                    "Expected object {} or object {} as iterable in foreach loop, got {}",
+                    "Expected {} or {} as iterable in foreach loop, got {}",
                     Type::Vector,
                     Type::String,
                     obj.kind()
@@ -532,7 +531,7 @@ impl Interpreter {
                 )
             }
             _ => Err(Error::value(
-                format!("object {} is not callable", obj.kind()),
+                format!("{} is not callable", obj.kind()),
                 self.ctx.set_line(line),
             )),
         }
@@ -589,28 +588,51 @@ impl Interpreter {
     fn visit_try_node(
         &mut self,
         try_nodes: Vec<Node>,
-        mut catch_blocks: CatchBlocks,
+        catch_blocks: Vec<(Option<Vec<Node>>, Option<String>, Vec<Node>)>,
         else_nodes: Option<Vec<Node>>,
     ) -> InterpreterResult {
         let mut exec_err = None;
         let mut err_alias = None;
-        let mut catch_nodes = Vec::new();
+        let mut catch_body = Vec::new();
 
-        for node in try_nodes {
+        'outer: for node in try_nodes {
             match self.visit(node) {
                 Ok(expr) => {
-                    if Some(State::Return) == self.state {
-                        return Ok(expr);
+                    if let Some(state) = self.state {
+                        match state {
+                            State::Return => return Ok(expr),
+                            State::Continue | State::Break => return Ok(Object::Nothing),
+                        }
                     }
                 }
                 Err(err) => {
-                    (exec_err, err_alias, catch_nodes) =
-                        if let Some((alias, nodes)) = catch_blocks.try_catch(err.kind) {
-                            (Some(err), alias, nodes)
-                        } else {
-                            return Err(err);
+                    for catch_block in catch_blocks {
+                        let (catchable_errors, alias, body) = catch_block;
+
+                        let Some(catchable_errors) = catchable_errors else {
+                            // Catch all errors
+                            // Dummy error
+                            exec_err = Some(Error::new(ErrorKind::Custom("DummyError".into()), None::<String>, None));
+                            catch_body = body;
+                            break 'outer;
                         };
-                    break;
+                        for catchable_error in catchable_errors {
+                            let line = catchable_error.line;
+                            let catchable_error = self.visit(catchable_error)?;
+                            let Object::Error(catchable_error) = catchable_error else {
+                                return Err(Error::value(format!("Expected {} in catch statement, got {}", Type::Error, catchable_error), self.ctx.set_line(line)));
+                            };
+                            if catchable_error.kind == err.kind {
+                                // Caught!
+                                exec_err = Some(err);
+                                err_alias = alias;
+                                catch_body = body;
+                                break 'outer;
+                            }
+                        }
+                    }
+                    // No error has been caught here!
+                    return Err(err);
                 }
             }
         }
@@ -619,13 +641,13 @@ impl Interpreter {
             if let Some(err_alias) = err_alias {
                 self.namespace.add(err_alias, Object::Error(err));
             }
-            let expr = self.visit_multiple(catch_nodes)?;
-            if Some(State::Return) == self.state {
+            let expr = self.visit_multiple(catch_body)?;
+            if let Some(State::Return) = self.state {
                 return Ok(expr);
             }
         } else if let Some(else_nodes) = else_nodes {
             let expr = self.visit_multiple(else_nodes)?;
-            if Some(State::Return) == self.state {
+            if let Some(State::Return) = self.state {
                 return Ok(expr);
             }
         }
@@ -642,11 +664,19 @@ impl Interpreter {
     #[inline]
     fn visit_throw_node(
         &mut self,
-        err_kind: ErrorKind,
-        err_msg: Option<Node>,
+        err: String,
+        msg: Option<Node>,
         line: Line,
     ) -> InterpreterResult {
-        let err_msg = match err_msg {
+        let err = self
+            .namespace
+            .get(&err)
+            .map_err(|err| Error::from((err, self.ctx.set_line(line))))?;
+        let Object::Error(err) = err else {
+            return Err(Error::value(format!("Expected {} in throw statement, got {}", Type::Error, err.kind()), self.ctx.set_line(line)));
+        };
+
+        let msg = match msg {
             Some(node) => {
                 let result = self.visit(node)?;
                 // Otherwise the expr does not live long enough
@@ -654,7 +684,11 @@ impl Interpreter {
             }
             None => String::new(),
         };
-        Err(Error::new(err_kind, err_msg, self.ctx.set_line(line)))
+        Err(Error::new(
+            err.kind,
+            Some(msg),
+            Some(self.ctx.set_line(line)),
+        ))
     }
 
     #[inline]
@@ -681,6 +715,15 @@ impl Interpreter {
             .filename(path)
             .parent(Box::new(self.ctx.set_line(line)))
             .visit_multiple(nodes)
+    }
+
+    #[inline]
+    fn visit_newerror_node(&mut self, ident: String) -> InterpreterResult {
+        self.namespace.add(
+            ident.clone(),
+            Object::Error(Error::new(ErrorKind::Custom(ident), None::<String>, None)),
+        );
+        Ok(Object::Nothing)
     }
 
     #[inline]
@@ -734,8 +777,8 @@ impl Interpreter {
             };
             return Err(Error::new(
                 ErrorKind::Type,
-                err_msg,
-                self.ctx.set_line(line),
+                Some(err_msg),
+                Some(self.ctx.set_line(line)),
             ));
         }
 

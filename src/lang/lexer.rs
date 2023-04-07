@@ -115,8 +115,8 @@ impl Lexer {
                 // The only error that can occurr here is overflow!
                 Err(_) => Err(Error::new(
                     ErrorKind::Overflow,
-                    num_str,
-                    self.ctx.set_line(self.line),
+                    Some(num_str),
+                    Some(self.ctx.set_line(self.line)),
                 )),
             }
         }
@@ -374,6 +374,7 @@ fn keywords() -> HashMap<&'static str, TokenKind> {
         ("throw", TokenKind::KwTHROW),
         ("using", TokenKind::KwUSING),
         ("as", TokenKind::KwAS),
+        ("newerror", TokenKind::KwNEWERROR),
     ])
 }
 

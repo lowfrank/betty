@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 use super::builtin_functions_names::*;
-use super::error::{CFError, ErrorKind};
+use super::error::{CFError, Error, ErrorKind};
 use super::object::Object;
 use super::type_alias::CFResult;
 
@@ -237,6 +237,62 @@ fn populate_namespace() -> HashMap<String, Object> {
         (
             BUILTIN_ISERR.into(),
             Object::BuiltinFun(BUILTIN_ISERR.into()),
+        ),
+        (
+            "ValueError".into(),
+            Object::Error(Error::new(ErrorKind::Value, None::<String>, None)),
+        ),
+        (
+            "TypeError".into(),
+            Object::Error(Error::new(ErrorKind::Type, None::<String>, None)),
+        ),
+        (
+            "UnknownIdentifierError".into(),
+            Object::Error(Error::new(
+                ErrorKind::UnknownIdentifier,
+                None::<String>,
+                None,
+            )),
+        ),
+        (
+            "OverflowError".into(),
+            Object::Error(Error::new(ErrorKind::Overflow, None::<String>, None)),
+        ),
+        (
+            "DivisionByZeroError".into(),
+            Object::Error(Error::new(ErrorKind::DivisionByZero, None::<String>, None)),
+        ),
+        (
+            "WrongArgumentsNumberError".into(),
+            Object::Error(Error::new(
+                ErrorKind::WrongArgumentsNumber,
+                None::<String>,
+                None,
+            )),
+        ),
+        (
+            "IndexOutOfBoundsError".into(),
+            Object::Error(Error::new(
+                ErrorKind::IndexOutOfBounds,
+                None::<String>,
+                None,
+            )),
+        ),
+        (
+            "FileIOError".into(),
+            Object::Error(Error::new(ErrorKind::FileIO, None::<String>, None)),
+        ),
+        (
+            "AssertionError".into(),
+            Object::Error(Error::new(ErrorKind::Assertion, None::<String>, None)),
+        ),
+        (
+            "VectorMutationError".into(),
+            Object::Error(Error::new(ErrorKind::VectorMutation, None::<String>, None)),
+        ),
+        (
+            "ModuleImportError".into(),
+            Object::Error(Error::new(ErrorKind::ModuleImport, None::<String>, None)),
         ),
     ])
 }

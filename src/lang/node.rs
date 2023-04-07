@@ -2,7 +2,6 @@
 
 use std::path::PathBuf;
 
-use super::error::ErrorKind;
 use super::token::TokenKind;
 use super::type_alias::{Float, Int, Line};
 
@@ -91,7 +90,7 @@ pub enum NodeKind {
     },
     Try {
         try_nodes: Vec<Node>,
-        catch_blocks: CatchBlocks,
+        catch_blocks: Vec<(Option<Vec<Node>>, Option<String>, Vec<Node>)>,
         else_nodes: Option<Vec<Node>>,
     },
     ConditionalExpr {
@@ -100,8 +99,8 @@ pub enum NodeKind {
         false_node: Box<Node>,
     },
     Throw {
-        err_kind: ErrorKind,
-        err_msg: Box<Option<Node>>,
+        err: String,
+        msg: Box<Option<Node>>,
     },
     InfiniteLoop {
         body: Vec<Node>,
@@ -116,51 +115,7 @@ pub enum NodeKind {
         path: PathBuf,
         relative_imports: Option<Vec<(String, Option<String>)>>,
     },
-}
-
-/// The [`CatchBlocks`] struct handles the catch statements
-#[derive(Clone, PartialEq, Debug, Default)]
-pub struct CatchBlocks {
-    pub err_kinds: Vec<Option<Vec<ErrorKind>>>,
-    pub err_aliases: Vec<Option<String>>,
-
-    // Multiple catch nodes, each catch node has its own statements
-    pub catch_nodes: Vec<Vec<Node>>,
-}
-
-impl CatchBlocks {
-    pub fn new() -> Self {
-        Default::default()
-    }
-
-    /// Push a new catch block at the end of the stack
-    pub fn push_block(
-        &mut self,
-        err_kinds: Option<Vec<ErrorKind>>,
-        err_alias: Option<String>,
-        nodes: Vec<Node>,
-    ) {
-        self.err_kinds.push(err_kinds);
-        self.err_aliases.push(err_alias);
-        self.catch_nodes.push(nodes);
-    }
-
-    /// Get the i-th catch block
-    fn get(&mut self, i: usize) -> Option<(Option<String>, Vec<Node>)> {
-        Some((self.err_aliases.remove(i), self.catch_nodes.remove(i)))
-    }
-
-    /// Try tp catch 'err_kind' by iterating over its errors. If it contains the error,
-    /// it is caught??? I can't remember it now
-    pub fn try_catch(&mut self, err_kind: ErrorKind) -> Option<(Option<String>, Vec<Node>)> {
-        for (i, err_kinds) in self.err_kinds.iter().enumerate() {
-            let Some(err_kinds) = err_kinds else {
-                return self.get(i);
-            };
-            if err_kinds.contains(&err_kind) {
-                return self.get(i);
-            }
-        }
-        None
-    }
+    NewError {
+        ident: String,
+    },
 }

@@ -140,8 +140,11 @@ impl BettyFile {
         let source = fs::read_to_string(&path).map_err(|err| {
             Error::new(
                 ErrorKind::ModuleImport,
-                format!("An error occurred when importing {:?}: {}", path, err),
-                ctx,
+                Some(format!(
+                    "An error occurred when importing {:?}: {}",
+                    path, err
+                )),
+                Some(ctx),
             )
         })?;
         let Some(tokens) = Lexer::new(Some(path.clone()), source.chars().collect()).make_tokens()? else {

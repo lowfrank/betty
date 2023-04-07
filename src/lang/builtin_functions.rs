@@ -165,12 +165,7 @@ macro_rules! builtin_fn {
                     Object::Int(n) => Ok(n),
                     _ => Err(CFError(
                         ErrorKind::Type,
-                        expected_value_err_msg(
-                            format!("object {}", Type::Int),
-                            n,
-                            Self::NAME,
-                            obj.kind(),
-                        ),
+                        expected_value_err_msg(format!("{}", Type::Int), n, Self::NAME, obj.kind()),
                     )),
                 }
             }
@@ -184,7 +179,7 @@ macro_rules! builtin_fn {
                     _ => Err(CFError(
                         ErrorKind::Type,
                         expected_value_err_msg(
-                            format!("object {}", Type::Float),
+                            format!("{}", Type::Float),
                             n,
                             Self::NAME,
                             obj.kind(),
@@ -202,7 +197,7 @@ macro_rules! builtin_fn {
                     _ => Err(CFError(
                         ErrorKind::Type,
                         expected_value_err_msg(
-                            format!("object {}", Type::String),
+                            format!("{}", Type::String),
                             n,
                             Self::NAME,
                             obj.kind(),
@@ -223,7 +218,7 @@ macro_rules! builtin_fn {
                     _ => Err(CFError(
                         ErrorKind::Type,
                         expected_value_err_msg(
-                            format!("object {}", Type::Vector),
+                            format!("{}", Type::Vector),
                             n,
                             Self::NAME,
                             obj.kind(),
@@ -241,7 +236,7 @@ macro_rules! builtin_fn {
                     _ => Err(CFError(
                         ErrorKind::Type,
                         expected_value_err_msg(
-                            format!("object {}", Type::Error),
+                            format!("{}", Type::Error),
                             n,
                             Self::NAME,
                             obj.kind(),
@@ -259,7 +254,7 @@ macro_rules! builtin_fn {
                     _ => Err(CFError(
                         ErrorKind::Type,
                         expected_value_err_msg(
-                            format!("object {}", Type::Bool),
+                            format!("{}", Type::Bool),
                             n,
                             Self::NAME,
                             obj.kind(),
@@ -298,10 +293,7 @@ macro_rules! vec_obj_mut {
         &mut *$v.try_borrow_mut().map_err(|_| {
             CFError(
                 ErrorKind::VectorMutation,
-                format!(
-                    "Cannot mutate object {} in the current context",
-                    Type::Vector
-                ),
+                format!("Cannot mutate {} in the current context", Type::Vector),
             )
         })?
     };
@@ -374,24 +366,14 @@ impl BuiltinFn for ToInt {
                     }
                     _ => Err(CFError(
                         ErrorKind::Value,
-                        format!(
-                            "Cannot parse object {} \"{}\" to object {}",
-                            Type::String,
-                            s,
-                            Type::Int
-                        ),
+                        format!("Cannot parse {} \"{}\" to {}", Type::String, s, Type::Int),
                     )),
                 },
             },
             _ => Err(CFError(
                 ErrorKind::Type,
                 expected_value_err_msg(
-                    format!(
-                        "object {} or object {} or object {}",
-                        Type::Int,
-                        Type::Float,
-                        Type::String
-                    ),
+                    format!("{} or {} or {}", Type::Int, Type::Float, Type::String),
                     1,
                     Self::NAME,
                     obj.kind(),
@@ -420,23 +402,13 @@ impl BuiltinFn for ToFloat {
                 }
                 Err(_) => Err(CFError(
                     ErrorKind::Value,
-                    format!(
-                        "Cannot parse object {} \"{}\" to object {}",
-                        Type::String,
-                        s,
-                        Type::Float
-                    ),
+                    format!("Cannot parse {} \"{}\" to {}", Type::String, s, Type::Float),
                 )),
             },
             _ => Err(CFError(
                 ErrorKind::Type,
                 expected_value_err_msg(
-                    format!(
-                        "object {} or object {} or object {}",
-                        Type::Int,
-                        Type::Float,
-                        Type::String
-                    ),
+                    format!("{} or {} or {}", Type::Int, Type::Float, Type::String),
                     1,
                     Self::NAME,
                     obj.kind(),
@@ -509,10 +481,7 @@ impl BuiltinFn for VPopFront {
         } else {
             Err(CFError(
                 ErrorKind::IndexOutOfBounds,
-                format!(
-                    "Cannot remove first element of empty object {}",
-                    Type::Vector
-                ),
+                format!("Cannot remove first element of empty {}", Type::Vector),
             ))
         }
     }
@@ -527,10 +496,7 @@ impl BuiltinFn for VPopBack {
         v.pop().ok_or_else(|| {
             CFError(
                 ErrorKind::IndexOutOfBounds,
-                format!(
-                    "Cannot remove last element of empty object {}",
-                    Type::Vector
-                ),
+                format!("Cannot remove last element of empty {}", Type::Vector),
             )
         })
     }
@@ -558,7 +524,7 @@ impl BuiltinFn for VFromRange {
                 let Some(Object::Int(num)) = args.pop_front() else {
                     return Err(CFError(
                         ErrorKind::Type,
-                        format!("All arguments passed to builtin function '{}', must be of object {}", BUILTIN_VFROM_RANGE, Type::Int)
+                        format!("All arguments passed to builtin function '{}', must be {}", BUILTIN_VFROM_RANGE, Type::Int)
                     ));
                 };
                 Ok(Object::Vector(range!(num)))
@@ -747,7 +713,10 @@ impl BuiltinFn for ErrLine {
     fn call(&self, mut args: FunArgs) -> CFResult {
         Self::check_args_len(args.len())?;
         let err = Self::err_from_args(&mut args, 1)?;
-        Ok(Object::Int(err.ctx.line as Int))
+        match err.ctx {
+            Some(ctx) => Ok(Object::Int(ctx.line as Int)),
+            None => Ok(Object::Nothing),
+        }
     }
 }
 
@@ -776,7 +745,7 @@ impl BuiltinFn for Len {
             _ => Err(CFError(
                 ErrorKind::Type,
                 expected_value_err_msg(
-                    format!("object {} or object {}", Type::String, Type::Vector),
+                    format!("{} or {}", Type::String, Type::Vector),
                     1,
                     Self::NAME,
                     obj.kind(),
@@ -813,7 +782,7 @@ impl BuiltinFn for Get {
                     None => Err(CFError(
                         ErrorKind::IndexOutOfBounds,
                         format!(
-                            "The index given to object {} in '{}' is out of bounds (upper bound: {}, lower bound: 0, index: {})",
+                            "The index given to {} in '{}' is out of bounds (upper bound: {}, lower bound: 0, index: {})",
                             Type::Vector,
                             Self::NAME,
                             v.len(),
@@ -827,7 +796,7 @@ impl BuiltinFn for Get {
                 None => Err(CFError(
                     ErrorKind::IndexOutOfBounds,
                     format!(
-                        "The index given to object {} in '{}' is out of bounds (upper bound: {}, lower bound: 0, index: {})",
+                        "The index given to {} in '{}' is out of bounds (upper bound: {}, lower bound: 0, index: {})",
                         Type::String,
                         Self::NAME,
                         s.len(),
@@ -838,7 +807,7 @@ impl BuiltinFn for Get {
             _ => Err(CFError(
                 ErrorKind::Type,
                 expected_value_err_msg(
-                    format!("object {} or object {}", Type::String, Type::Vector),
+                    format!("{} or {}", Type::String, Type::Vector),
                     1,
                     Self::NAME,
                     iter.kind()
@@ -874,7 +843,7 @@ impl BuiltinFn for Join {
             _ => Err(CFError(
                 ErrorKind::Type,
                 expected_value_err_msg(
-                    format!("object {} or object {}", Type::String, Type::Vector),
+                    format!("{} or {}", Type::String, Type::Vector),
                     2,
                     Self::NAME,
                     obj.kind(),
@@ -931,7 +900,7 @@ impl BuiltinFn for Split {
             }
             (obj, split) => Err(CFError(
                 ErrorKind::Type,
-                format!("Expected (object {}, object {}) or (object {}, any) as arguments of builtin function '{}', got ({}, {})",
+                format!("Expected ({}, {}) or ({}, any) as arguments of builtin function '{}', got ({}, {})",
                     Type::String,
                     Type::String,
                     Type::Vector,
@@ -965,7 +934,7 @@ impl BuiltinFn for Replace {
             (Object::String(s), Object::String(old), Object::String(new)) => Ok(Object::String(s.replace(&old, &new))),
             (obj, old, new) => Err(CFError(
                 ErrorKind::Type,
-                format!("Expected (object {}, any, any) or (object {}, object {}, object {}) as arguments of builtin function '{}', got ({}, {}, {})",
+                format!("Expected ({}, any, any) or ({}, {}, {}) as arguments of builtin function '{}', got ({}, {}, {})",
                     Type::Vector,
                     Type::String,
                     Type::String,
@@ -1009,7 +978,7 @@ impl BuiltinFn for Slice {
             _ => Err(CFError(
                 ErrorKind::Type,
                 expected_value_err_msg(
-                    format!("object {} or object {}", Type::String, Type::Vector),
+                    format!("{} or {}", Type::String, Type::Vector),
                     1,
                     Self::NAME,
                     obj.kind(),

@@ -66,6 +66,7 @@ pub enum TokenKind {
     KwTHROW,    // keyword 'throw'
     KwUSING,    // keyword 'using'
     KwAS,       // keyword 'as'
+    KwNEWERROR, // keyword 'newerror'
 
     True,    // builtin identifier 'true'
     False,   // builtin identifier 'false'
@@ -131,6 +132,7 @@ impl fmt::Display for TokenKind {
             Self::KwTHROW => write!(f, "keyword 'throw'"),
             Self::KwUSING => write!(f, "keyword 'using'"),
             Self::KwAS => write!(f, "keyword 'as'"),
+            Self::KwNEWERROR => write!(f, "keyword 'newerror'"),
             Self::True => write!(f, "builtin identifier 'true'"),
             Self::False => write!(f, "builtin identifier 'false'"),
             Self::Nothing => write!(f, "builtin identifier 'nothing'"),

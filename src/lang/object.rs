@@ -206,7 +206,7 @@ impl Object {
                     Err(CFError(
                         ErrorKind::Value,
                         format!(
-                            "Cannot multiply object {} \"{}\" by negative object {} '{}'",
+                            "Cannot multiply {} \"{}\" by negative {} '{}'",
                             Type::String,
                             s,
                             Type::Int,
@@ -221,7 +221,7 @@ impl Object {
                 cmp::Ordering::Less => Err(CFError(
                     ErrorKind::Value,
                     format!(
-                        "Cannot multiply object {} by negative object {} '{}'",
+                        "Cannot multiply {} by negative {} '{}'",
                         Type::Vector,
                         Type::Int,
                         n
@@ -466,16 +466,16 @@ impl Object {
     #[inline]
     pub fn kind(&self) -> String {
         match self {
-            Self::Int(_) => format!("object {}", Type::Int),
-            Self::Float(_) => format!("object {}", Type::Float),
-            Self::String(_) => format!("object {}", Type::String),
-            Self::Bool(_) => format!("object {}", Type::Bool),
-            Self::Vector(_) => format!("object {}", Type::Vector),
-            Self::Nothing => format!("object {}", Type::Nothing),
-            Self::Fun(name, ..) => format!("object {} {}", Type::Fun, name),
-            Self::BuiltinFun(name) => format!("object {} {}", Type::BuiltinFun, name),
-            Self::AnonymousFun(..) => format!("object {}", Type::AnonymousFun),
-            Self::Error(name) => format!("object {} ({})", Type::Error, name),
+            Self::Int(_) => format!("{}", Type::Int),
+            Self::Float(_) => format!("{}", Type::Float),
+            Self::String(_) => format!("{}", Type::String),
+            Self::Bool(_) => format!("{}", Type::Bool),
+            Self::Vector(_) => format!("{}", Type::Vector),
+            Self::Nothing => format!("{}", Type::Nothing),
+            Self::Fun(name, ..) => format!("{} {}", Type::Fun, name),
+            Self::BuiltinFun(name) => format!("{} {}", Type::BuiltinFun, name),
+            Self::AnonymousFun(..) => format!("{}", Type::AnonymousFun),
+            Self::Error(name) => format!("{} ({})", Type::Error, name),
         }
     }
 
@@ -674,7 +674,7 @@ impl TryFrom<Object> for bool {
             Object::Bool(value) => Ok(value),
             _ => Err(CFError(
                 ErrorKind::Type,
-                format!("Expected object {}, got {}", Type::Bool, obj.kind()),
+                format!("Expected {}, got {}", Type::Bool, obj.kind()),
             )),
         }
     }
@@ -688,7 +688,7 @@ impl TryFrom<Object> for Int {
             Object::Int(num) => Ok(num),
             _ => Err(CFError(
                 ErrorKind::Type,
-                format!("Expected object {}, got {}", Type::Int, obj.kind()),
+                format!("Expected {}, got {}", Type::Int, obj.kind()),
             )),
         }
     }

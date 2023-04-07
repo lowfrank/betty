@@ -1,8 +1,8 @@
 use std::collections::{HashSet, VecDeque};
 use std::path::PathBuf;
 
-use super::error::{BuiltinErrors, Ctx, Error, ErrorKind};
-use super::node::{CatchBlocks, Node, NodeKind};
+use super::error::{Ctx, Error};
+use super::node::{Node, NodeKind};
 use super::run::BettyFile;
 use super::token::{Token, TokenKind};
 use super::typ::Type;
@@ -137,6 +137,9 @@ impl Parser {
 
             // Import statement
             (TokenKind::KwUSING, _) => self.using_node(),
+
+            // New error statement
+            (TokenKind::KwNEWERROR, _) => self.newerror_node(),
 
             // Expression
             _ => self.expr(),
@@ -334,7 +337,7 @@ impl Parser {
             TokenKind::Ident(ident) => {
                 self.advance();
                 Ok(Node::new(NodeKind::Ident { ident }, line))
-            },
+            }
             TokenKind::True => {
                 self.advance();
                 Ok(Node::new(NodeKind::True, line))
@@ -953,23 +956,10 @@ impl Parser {
         ))
     }
 
-    fn get_err_name_from_ident(&mut self) -> Result<String, Error> {
-        if let TokenKind::Ident(ident) = self.current_token.kind.clone() {
-            self.advance();
-            Ok(ident)
-        } else {
-            Err(Error::syntax(
-                format!(
-                    "Expected identifier as error name, got {}",
-                    self.current_token
-                ),
-                self.ctx.set_line(self.current_token.line),
-            ))
-        }
-    }
-
-    fn get_catch_blocks(&mut self) -> Result<CatchBlocks, Error> {
-        let mut catch_blocks = CatchBlocks::new();
+    fn get_catch_blocks(
+        &mut self,
+    ) -> Result<Vec<(Option<Vec<Node>>, Option<String>, Vec<Node>)>, Error> {
+        let mut catch_blocks = Vec::new();
         while self.current_token.kind == TokenKind::KwCATCH {
             self.advance();
 
@@ -979,11 +969,11 @@ impl Parser {
             // If there is an error alias, then there has to be at least one
             // error to catch
             let at_least_one_err = err_alias.is_some();
-            let err_names = self.get_err_names(at_least_one_err)?;
+            let errors = self.get_errors(at_least_one_err)?;
             self.check_token_kind(TokenKind::KwDO, format!("Expected {}", TokenKind::KwDO))?;
             self.skip_newlines();
-            let nodes = self.get_catch_nodes()?;
-            catch_blocks.push_block(err_names, err_alias, nodes);
+            let catch_body = self.get_catch_nodes()?;
+            catch_blocks.push((errors, err_alias, catch_body));
         }
 
         Ok(catch_blocks)
@@ -1002,14 +992,12 @@ impl Parser {
 
     /// Return the error names that will be caught in the catch block
     /// If None, all the errors will be caught
-    fn get_err_names(&mut self, at_least_one_err: bool) -> Result<Option<Vec<ErrorKind>>, Error> {
+    fn get_errors(&mut self, at_least_one_err: bool) -> Result<Option<Vec<Node>>, Error> {
         let line = self.current_token.line;
         let mut err_names = Vec::new();
         self.skip_newlines();
         while self.current_token.kind != TokenKind::KwDO {
-            let err = self.get_err_name_from_ident()?;
-            let err = ErrorKind::try_from(err)
-                .map_err(|(kind, msg)| Error::new(kind, msg, self.ctx.set_line(line)))?;
+            let err = self.expr()?;
             err_names.push(err);
             match self.current_token.kind {
                 TokenKind::KwDO => {}
@@ -1033,7 +1021,7 @@ impl Parser {
         if err_names.is_empty() {
             if at_least_one_err {
                 Err(Error::syntax(
-                    format!("Expect one of {} after error alias", BuiltinErrors),
+                    "Expect an error after error alias",
                     self.ctx.set_line(line),
                 ))
             } else {
@@ -1072,14 +1060,14 @@ impl Parser {
     fn throw_node(&mut self) -> ParserResult {
         let line = self.current_token.line;
         self.advance(); // skip 'throw'
-        let err_name = self.get_err_name_from_ident()?;
-        let err_kind = ErrorKind::try_from(err_name)
-            .map_err(|(kind, msg)| Error::new(kind, msg, self.ctx.set_line(line)))?;
-
-        let err_msg = if self.current_token.kind == TokenKind::LeftRoundBracket {
+        let TokenKind::Ident(err) = self.current_token.kind.clone() else {
+            return Err(Error::syntax(format!("Expected identifier after {}, got {}", TokenKind::KwTHROW, self.current_token), self.ctx.set_line(line)));
+        };
+        self.advance(); // skip ident
+        let msg = if self.current_token.kind == TokenKind::LeftRoundBracket {
             self.advance(); // skip '('
             self.skip_newlines();
-            let err_msg = self.expr()?;
+            let msg = self.expr()?;
             self.skip_newlines();
             self.check_token_kind(
                 TokenKind::RightRoundBracket,
@@ -1088,14 +1076,14 @@ impl Parser {
                     TokenKind::RightRoundBracket
                 ),
             )?;
-            Some(err_msg)
+            Some(msg)
         } else {
             None
         };
         Ok(Node::new(
             NodeKind::Throw {
-                err_kind,
-                err_msg: Box::new(err_msg),
+                err,
+                msg: Box::new(msg),
             },
             line,
         ))
@@ -1178,6 +1166,16 @@ impl Parser {
 
         self.advance(); // skip alias
         Ok(Some(alias))
+    }
+
+    fn newerror_node(&mut self) -> ParserResult {
+        let line = self.current_token.line;
+        self.advance(); // skip 'newerror'
+        let TokenKind::Ident(ident) = self.current_token.kind.clone() else {
+            return Err(Error::syntax(format!("Expected identifier after {}, got {}",TokenKind::KwNEWERROR, self.current_token), self.ctx.set_line(line)))
+        };
+        self.advance(); // skip ident
+        Ok(Node::new(NodeKind::NewError { ident }, line))
     }
 
     /// Check whether the current token is of the kind provided. If yes, skip it,

@@ -77,49 +77,7 @@ impl Ctx {
     }
 }
 
-pub struct BuiltinErrors;
-impl BuiltinErrors {
-    pub const VALUE: &'static str = "ValueError";
-    pub const TYPE: &'static str = "TypeError";
-    pub const UNKNOWN_IDENTIFIER: &'static str = "UnknownIdentifierError";
-    pub const OVERFLOW: &'static str = "OverflowError";
-    pub const DIVISION_BY_ZERO: &'static str = "DivisionByZeroError";
-    pub const INDEX_OUT_OF_BOUNDS: &'static str = "IndexOutOfBoundsError";
-    pub const WRONG_ARGUMENTS_NUMBER: &'static str = "WrongArgumentsNumberError";
-    pub const FILE_IO: &'static str = "FileIOError";
-    pub const ASSERTION: &'static str = "AssertionError";
-    pub const VECTOR_MUTATION: &'static str = "VectorMutationError";
-    pub const MODULE_IMPORT: &'static str = "ModuleImportError";
-    const NAMES: [&'static str; 11] = [
-        Self::VALUE,
-        Self::TYPE,
-        Self::UNKNOWN_IDENTIFIER,
-        Self::OVERFLOW,
-        Self::DIVISION_BY_ZERO,
-        Self::WRONG_ARGUMENTS_NUMBER,
-        Self::INDEX_OUT_OF_BOUNDS,
-        Self::FILE_IO,
-        Self::ASSERTION,
-        Self::VECTOR_MUTATION,
-        Self::MODULE_IMPORT,
-    ];
-}
-
-impl fmt::Display for BuiltinErrors {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "{}",
-            Self::NAMES
-                .iter()
-                .map(|name| format!("'{}'", name))
-                .collect::<Vec<_>>()
-                .join(", ")
-        )
-    }
-}
-
-#[derive(Debug, PartialEq, Clone, Copy, Eq)]
+#[derive(Debug, PartialEq, Clone, Eq)]
 pub enum ErrorKind {
     Syntax, // Uncatchable
     Value,
@@ -133,34 +91,14 @@ pub enum ErrorKind {
     Assertion,
     VectorMutation,
     ModuleImport,
+    Custom(String),
 }
 
 impl fmt::Display for ErrorKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:?}Error", self)
-    }
-}
-
-impl TryFrom<String> for ErrorKind {
-    type Error = (ErrorKind, String);
-
-    fn try_from(string: String) -> Result<Self, Self::Error> {
-        match string.as_str() {
-            BuiltinErrors::VALUE => Ok(Self::Value),
-            BuiltinErrors::TYPE => Ok(Self::Type),
-            BuiltinErrors::UNKNOWN_IDENTIFIER => Ok(Self::UnknownIdentifier),
-            BuiltinErrors::OVERFLOW => Ok(Self::Overflow),
-            BuiltinErrors::DIVISION_BY_ZERO => Ok(Self::DivisionByZero),
-            BuiltinErrors::WRONG_ARGUMENTS_NUMBER => Ok(Self::WrongArgumentsNumber),
-            BuiltinErrors::INDEX_OUT_OF_BOUNDS => Ok(Self::IndexOutOfBounds),
-            BuiltinErrors::FILE_IO => Ok(Self::FileIO),
-            BuiltinErrors::ASSERTION => Ok(Self::Assertion),
-            BuiltinErrors::VECTOR_MUTATION => Ok(Self::VectorMutation),
-            BuiltinErrors::MODULE_IMPORT => Ok(Self::ModuleImport),
-            _ => Err((
-                ErrorKind::Syntax,
-                format!("Expected one of {}, got '{}'", BuiltinErrors, string),
-            )),
+        match self {
+            Self::Custom(err) => write!(f, "{}", err),
+            _ => write!(f, "{:?}Error", self),
         }
     }
 }
@@ -168,8 +106,8 @@ impl TryFrom<String> for ErrorKind {
 #[derive(Clone, Debug)]
 pub struct Error {
     pub kind: ErrorKind,
-    msg: String,
-    pub ctx: Ctx,
+    msg: Option<String>,
+    pub ctx: Option<Ctx>,
 }
 
 impl fmt::Display for Error {
@@ -187,41 +125,45 @@ impl PartialEq for Error {
 impl From<(CFError, Ctx)> for Error {
     fn from(args: (CFError, Ctx)) -> Self {
         let (e, ctx) = args;
+        // msg and ctx will never be None, because a CFError is always thrown
+        // internally and therefore it must have some context associated to it
         Self {
             kind: e.0,
-            msg: e.1,
-            ctx,
+            msg: Some(e.1),
+            ctx: Some(ctx),
         }
     }
 }
 
 impl Error {
-    pub fn new(kind: ErrorKind, msg: impl Into<String>, ctx: Ctx) -> Self {
+    pub fn new(kind: ErrorKind, msg: Option<impl Into<String>>, ctx: Option<Ctx>) -> Self {
         Self {
             kind,
-            msg: msg.into(),
+            msg: msg.map(Into::into),
             ctx,
         }
     }
 
     pub fn syntax(msg: impl Into<String>, ctx: Ctx) -> Self {
-        Self::new(ErrorKind::Syntax, msg, ctx)
+        Self::new(ErrorKind::Syntax, Some(msg), Some(ctx))
     }
 
     pub fn value(msg: impl Into<String>, ctx: Ctx) -> Self {
-        Self::new(ErrorKind::Value, msg, ctx)
+        Self::new(ErrorKind::Value, Some(msg), Some(ctx))
     }
 
     fn make_report(&self) -> String {
+        let Some(ctx) = &self.ctx else {
+            return self.short_msg();
+        };
         let tail = format!("\n    {}", self.short_msg());
-        self.ctx.build_report(tail)
+        ctx.build_report(tail)
     }
 
     pub fn short_msg(&self) -> String {
-        if self.msg.is_empty() {
-            format!("{}", self.kind)
-        } else {
-            format!("{}: {}", self.kind, self.msg)
+        match &self.msg {
+            Some(msg) if !msg.is_empty() => format!("{}: {}", self.kind, msg),
+            _ => format!("{}", self.kind),
         }
     }
 
