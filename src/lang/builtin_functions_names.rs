@@ -39,7 +39,6 @@ pub const BUILTIN_ERR_KIND: &str = "err_kind";
 
 // Misc
 pub const BUILTIN_ASSERT: &str = "assert";
-pub const BUILTIN_TYPEOF: &str = "typeof";
 
 // Iterables
 pub const BUILTIN_LEN: &str = "len";
@@ -48,3 +47,12 @@ pub const BUILTIN_JOIN: &str = "join";
 pub const BUILTIN_SLICE: &str = "slice";
 pub const BUILTIN_SPLIT: &str = "split";
 pub const BUILTIN_REPLACE: &str = "replace";
+
+// Type checking
+pub const BUILTIN_ISINT: &str = "isint";
+pub const BUILTIN_ISFLOAT: &str = "isfloat";
+pub const BUILTIN_ISSTR: &str = "isstr";
+pub const BUILTIN_ISBOOL: &str = "isbool";
+pub const BUILTIN_ISVEC: &str = "isvec";
+pub const BUILTIN_ISCALLABLE: &str = "iscallable";
+pub const BUILTIN_ISERR: &str = "iserr";

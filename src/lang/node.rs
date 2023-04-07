@@ -4,7 +4,6 @@ use std::path::PathBuf;
 
 use super::error::ErrorKind;
 use super::token::TokenKind;
-use super::typ::Type;
 use super::type_alias::{Float, Int, Line};
 
 #[derive(Clone, PartialEq, Debug)]
@@ -103,9 +102,6 @@ pub enum NodeKind {
     Throw {
         err_kind: ErrorKind,
         err_msg: Box<Option<Node>>,
-    },
-    Type {
-        inner: Type,
     },
     InfiniteLoop {
         body: Vec<Node>,

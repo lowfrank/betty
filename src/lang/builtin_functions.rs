@@ -270,24 +270,6 @@ macro_rules! builtin_fn {
 
             #[allow(dead_code)]
             #[inline]
-            fn type_from_args(args: &mut FunArgs, n: u8) -> Result<Type, CFError> {
-                let obj = Self::arg(args);
-                match obj {
-                    Object::Type(ty) => Ok(ty),
-                    _ => Err(CFError(
-                        ErrorKind::Type,
-                        expected_value_err_msg(
-                            format!("object {}", Type::Type),
-                            n,
-                            Self::NAME,
-                            obj.kind(),
-                        ),
-                    )),
-                }
-            }
-
-            #[allow(dead_code)]
-            #[inline]
             fn check_index_out_of_bounds(index: Int, upper: usize) -> Result<(), CFError> {
                 if index < 0 || index > upper as Int {
                     Err(CFError(
@@ -1063,12 +1045,75 @@ impl BuiltinFn for Assert {
     }
 }
 
-builtin_fn!(TypeOf, BUILTIN_TYPEOF, 1);
-impl BuiltinFn for TypeOf {
+builtin_fn!(IsInt, BUILTIN_ISINT, 1);
+impl BuiltinFn for IsInt {
     #[inline]
     fn call(&self, mut args: FunArgs) -> CFResult {
         Self::check_args_len(args.len())?;
         let obj = Self::arg(&mut args);
-        Ok(Object::Type(Type::from(obj)))
+        Ok(Object::Bool(matches!(obj, Object::Int(_))))
+    }
+}
+
+builtin_fn!(IsFloat, BUILTIN_ISFLOAT, 1);
+impl BuiltinFn for IsFloat {
+    #[inline]
+    fn call(&self, mut args: FunArgs) -> CFResult {
+        Self::check_args_len(args.len())?;
+        let obj = Self::arg(&mut args);
+        Ok(Object::Bool(matches!(obj, Object::Float(_))))
+    }
+}
+
+builtin_fn!(IsStr, BUILTIN_ISSTR, 1);
+impl BuiltinFn for IsStr {
+    #[inline]
+    fn call(&self, mut args: FunArgs) -> CFResult {
+        Self::check_args_len(args.len())?;
+        let obj = Self::arg(&mut args);
+        Ok(Object::Bool(matches!(obj, Object::String(_))))
+    }
+}
+
+builtin_fn!(IsBool, BUILTIN_ISBOOL, 1);
+impl BuiltinFn for IsBool {
+    #[inline]
+    fn call(&self, mut args: FunArgs) -> CFResult {
+        Self::check_args_len(args.len())?;
+        let obj = Self::arg(&mut args);
+        Ok(Object::Bool(matches!(obj, Object::Bool(_))))
+    }
+}
+
+builtin_fn!(IsVec, BUILTIN_ISVEC, 1);
+impl BuiltinFn for IsVec {
+    #[inline]
+    fn call(&self, mut args: FunArgs) -> CFResult {
+        Self::check_args_len(args.len())?;
+        let obj = Self::arg(&mut args);
+        Ok(Object::Bool(matches!(obj, Object::Vector(_))))
+    }
+}
+
+builtin_fn!(IsCallable, BUILTIN_ISCALLABLE, 1);
+impl BuiltinFn for IsCallable {
+    #[inline]
+    fn call(&self, mut args: FunArgs) -> CFResult {
+        Self::check_args_len(args.len())?;
+        let obj = Self::arg(&mut args);
+        Ok(Object::Bool(matches!(
+            obj,
+            Object::Fun(..) | Object::AnonymousFun(..) | Object::BuiltinFun(..)
+        )))
+    }
+}
+
+builtin_fn!(IsErr, BUILTIN_ISERR, 1);
+impl BuiltinFn for IsErr {
+    #[inline]
+    fn call(&self, mut args: FunArgs) -> CFResult {
+        Self::check_args_len(args.len())?;
+        let obj = Self::arg(&mut args);
+        Ok(Object::Bool(matches!(obj, Object::Error(_))))
     }
 }

@@ -114,7 +114,6 @@ impl Interpreter {
             NodeKind::False => Ok(Object::Bool(false)),
             NodeKind::Nothing => Ok(Object::Nothing),
             NodeKind::AnonymousFun { arg_names, body } => Ok(Object::AnonymousFun(arg_names, body)),
-            NodeKind::Type { inner } => Ok(Object::Type(inner)),
             NodeKind::Fun {
                 fun_name,
                 arg_names,

@@ -331,7 +331,10 @@ impl Parser {
                 Ok(Node::new(NodeKind::String { string }, line))
             }
             TokenKind::LeftSquareBracket => self.vector_node(),
-            TokenKind::Ident(ident) => self.ident_node(ident),
+            TokenKind::Ident(ident) => {
+                self.advance();
+                Ok(Node::new(NodeKind::Ident { ident }, line))
+            },
             TokenKind::True => {
                 self.advance();
                 Ok(Node::new(NodeKind::True, line))
@@ -359,16 +362,6 @@ impl Parser {
                 format!("Expected expression, got {}", self.current_token),
                 self.ctx.set_line(self.current_token.line),
             )),
-        }
-    }
-
-    /// Access an identifier or a type
-    fn ident_node(&mut self, ident: String) -> ParserResult {
-        let line = self.current_token.line;
-        self.advance();
-        match Type::try_from(ident.as_str()) {
-            Ok(inner) => Ok(Node::new(NodeKind::Type { inner }, line)),
-            Err(()) => Ok(Node::new(NodeKind::Ident { ident }, line)),
         }
     }
 

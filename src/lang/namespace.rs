@@ -5,7 +5,6 @@ use std::rc::Rc;
 use super::builtin_functions_names::*;
 use super::error::{CFError, ErrorKind};
 use super::object::Object;
-use super::typ::Type;
 use super::type_alias::CFResult;
 
 #[derive(Debug)]
@@ -182,10 +181,6 @@ fn populate_namespace() -> HashMap<String, Object> {
             BUILTIN_ASSERT.into(),
             Object::BuiltinFun(BUILTIN_ASSERT.into()),
         ),
-        (
-            BUILTIN_TYPEOF.into(),
-            Object::BuiltinFun(BUILTIN_TYPEOF.into()),
-        ),
         (BUILTIN_GET.into(), Object::BuiltinFun(BUILTIN_GET.into())),
         (
             BUILTIN_FREAD.into(),
@@ -215,22 +210,33 @@ fn populate_namespace() -> HashMap<String, Object> {
             BUILTIN_ERR_KIND.into(),
             Object::BuiltinFun(BUILTIN_ERR_KIND.into()),
         ),
-        (Type::INT_LITERAL.into(), Object::Type(Type::Int)),
-        (Type::FLOAT_LITERAL.into(), Object::Type(Type::Float)),
-        (Type::STRING_LITERAL.into(), Object::Type(Type::String)),
-        (Type::BOOL_LITERAL.into(), Object::Type(Type::Bool)),
-        (Type::VECTOR_LITERAL.into(), Object::Type(Type::Vector)),
-        (Type::NOTHING_LITERAL.into(), Object::Type(Type::Nothing)),
-        (Type::FUN_LITERAL.into(), Object::Type(Type::Fun)),
         (
-            Type::BUILTIN_FUN_LITERAL.into(),
-            Object::Type(Type::BuiltinFun),
+            BUILTIN_ISINT.into(),
+            Object::BuiltinFun(BUILTIN_ISINT.into()),
         ),
         (
-            Type::ANONYMOUS_FUN_LITERAL.into(),
-            Object::Type(Type::AnonymousFun),
+            BUILTIN_ISFLOAT.into(),
+            Object::BuiltinFun(BUILTIN_ISFLOAT.into()),
         ),
-        (Type::ERROR_LITERAL.into(), Object::Type(Type::Error)),
-        (Type::TYPE_LITERAL.into(), Object::Type(Type::Type)),
+        (
+            BUILTIN_ISSTR.into(),
+            Object::BuiltinFun(BUILTIN_ISSTR.into()),
+        ),
+        (
+            BUILTIN_ISBOOL.into(),
+            Object::BuiltinFun(BUILTIN_ISBOOL.into()),
+        ),
+        (
+            BUILTIN_ISVEC.into(),
+            Object::BuiltinFun(BUILTIN_ISVEC.into()),
+        ),
+        (
+            BUILTIN_ISCALLABLE.into(),
+            Object::BuiltinFun(BUILTIN_ISCALLABLE.into()),
+        ),
+        (
+            BUILTIN_ISERR.into(),
+            Object::BuiltinFun(BUILTIN_ISERR.into()),
+        ),
     ])
 }

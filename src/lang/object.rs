@@ -1,3 +1,7 @@
+//! The [`Object`] is the basic structure of a `betty` program. Every [`Object`]
+//! is composed of one type, and a variable can refer to different [`Object`]s
+//! during the program execution.
+
 use std::cell::RefCell;
 use std::cmp;
 use std::collections::HashMap;
@@ -29,14 +33,16 @@ pub enum Object {
     Fun(String, Vec<String>, Vec<Node>),
     BuiltinFun(String),
     Error(Error),
-    Type(Type),
 }
 
+/// How do we want to print the [`Object`]?
 impl fmt::Display for Object {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Int(n) => write!(f, "{}", n),
+
+            // The current implementation prints Floats with 15 decimal points
             Self::Float(n) => write!(f, "{:.15}", n),
             Self::String(s) => write!(f, "{}", s),
             Self::Vector(vector) => {
@@ -47,6 +53,8 @@ impl fmt::Display for Object {
                     v.iter()
                         .map(|obj| {
                             match obj {
+                                // We want to nicely format strings inside vectors,
+                                // therefore we put their contents between double quotes
                                 Self::String(s) => format!("\"{}\"", s),
                                 /*
                                 ERROR
@@ -63,7 +71,7 @@ impl fmt::Display for Object {
                                 Show a placeholder instead.
 
                                 Check for pointer address equality. If it's the same, print placeholder instead.
-                                This way we avoid infinite call to .borrow()
+                                This way we avoid infinite calls to .borrow()
                                 */
                                 Self::Vector(inner) if Rc::as_ptr(vector) == Rc::as_ptr(inner) => {
                                     format!("[Vector at {:?}]", Rc::as_ptr(inner))
@@ -81,7 +89,6 @@ impl fmt::Display for Object {
             Self::BuiltinFun(..) => write!(f, "{}", self.kind()),
             Self::AnonymousFun(..) => write!(f, "{}", self.kind()),
             Self::Error(err) => write!(f, "{}", err),
-            Self::Type(kind) => write!(f, "type {}", kind),
         }
     }
 }
@@ -469,7 +476,6 @@ impl Object {
             Self::BuiltinFun(name) => format!("object {} {}", Type::BuiltinFun, name),
             Self::AnonymousFun(..) => format!("object {}", Type::AnonymousFun),
             Self::Error(name) => format!("object {} ({})", Type::Error, name),
-            Self::Type(kind) => format!("type {}", kind),
         }
     }
 
@@ -536,8 +542,6 @@ impl PartialEq for Object {
             (Self::BuiltinFun(name1), Self::BuiltinFun(name2)) => name1 == name2,
 
             (Self::Error(err1), Self::Error(err2)) => err1 == err2,
-
-            (Self::Type(typ1), Self::Type(typ2)) => typ1 == typ2,
 
             _ => false,
         }
@@ -648,7 +652,14 @@ builtin_fun_caller! {
     BUILTIN_REPLACE => Replace,
 
     BUILTIN_ASSERT => Assert,
-    BUILTIN_TYPEOF => TypeOf,
+
+    BUILTIN_ISINT => IsInt,
+    BUILTIN_ISFLOAT => IsFloat,
+    BUILTIN_ISSTR => IsStr,
+    BUILTIN_ISVEC => IsVec,
+    BUILTIN_ISBOOL => IsBool,
+    BUILTIN_ISCALLABLE => IsCallable,
+    BUILTIN_ISERR => IsErr,
 }
 
 lazy_static! {
