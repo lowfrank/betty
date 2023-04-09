@@ -135,7 +135,7 @@ impl From<(CFError, Ctx)> for Error {
         // internally and therefore it must have some context associated to it
         Self {
             kind: e.0,
-            msg: Some(e.1),
+            msg: if e.1.is_empty() { None } else { Some(e.1) },
             ctx: Some(ctx),
         }
     }
