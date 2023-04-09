@@ -209,6 +209,10 @@ fn populate_namespace() -> HashMap<String, Object> {
             Object::BuiltinFun(BUILTIN_ERR_KIND.into()),
         ),
         (
+            BUILTIN_ERR_DESCRIPTION.into(),
+            Object::BuiltinFun(BUILTIN_ERR_DESCRIPTION.into()),
+        ),
+        (
             BUILTIN_ISINT.into(),
             Object::BuiltinFun(BUILTIN_ISINT.into()),
         ),

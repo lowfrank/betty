@@ -88,7 +88,7 @@ impl fmt::Display for Object {
             Self::Fun(..) => write!(f, "{}", self.kind()),
             Self::BuiltinFun(..) => write!(f, "{}", self.kind()),
             Self::AnonymousFun(..) => write!(f, "{}", self.kind()),
-            Self::Error(err) => write!(f, "{}", err),
+            Self::Error(..) => write!(f, "{}", self.kind()),
         }
     }
 }
@@ -475,7 +475,7 @@ impl Object {
             Self::Fun(name, ..) => format!("{} {}", Type::Fun, name),
             Self::BuiltinFun(name) => format!("{} {}", Type::BuiltinFun, name),
             Self::AnonymousFun(..) => format!("{}", Type::AnonymousFun),
-            Self::Error(name) => format!("{} ({})", Type::Error, name),
+            Self::Error(name) => format!("{} {}", Type::Error, name),
         }
     }
 
@@ -643,6 +643,7 @@ builtin_fun_caller! {
     BUILTIN_ERR_TRACEBACK => ErrTraceback,
     BUILTIN_ERR_LINE => ErrLine,
     BUILTIN_ERR_KIND => ErrKind,
+    BUILTIN_ERR_DESCRIPTION => ErrDescription,
 
     BUILTIN_LEN => Len,
     BUILTIN_GET => Get,

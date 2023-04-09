@@ -732,6 +732,19 @@ impl BuiltinFn for ErrKind {
     }
 }
 
+builtin_fn!(ErrDescription, BUILTIN_ERR_DESCRIPTION, 1);
+impl BuiltinFn for ErrDescription {
+    #[inline]
+    fn call(&self, mut args: FunArgs) -> CFResult {
+        Self::check_args_len(args.len())?;
+        let err = Self::err_from_args(&mut args, 1)?;
+        match err.msg {
+            Some(msg) => Ok(Object::String(msg)),
+            None => Ok(Object::Nothing),
+        }
+    }
+}
+
 builtin_fn!(Len, BUILTIN_LEN, 1);
 impl BuiltinFn for Len {
     #[inline]

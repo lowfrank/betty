@@ -36,6 +36,7 @@ pub const BUILTIN_ERR_SHORT: &str = "err_short";
 pub const BUILTIN_ERR_TRACEBACK: &str = "err_traceback";
 pub const BUILTIN_ERR_LINE: &str = "err_line";
 pub const BUILTIN_ERR_KIND: &str = "err_kind";
+pub const BUILTIN_ERR_DESCRIPTION: &str = "err_description";
 
 // Misc
 pub const BUILTIN_ASSERT: &str = "assert";

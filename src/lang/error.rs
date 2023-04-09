@@ -112,7 +112,7 @@ impl fmt::Display for ErrorKind {
 #[derive(Clone, Debug)]
 pub struct Error {
     pub kind: ErrorKind,
-    msg: Option<String>,
+    pub msg: Option<String>,
     pub ctx: Option<Ctx>,
 }
 
