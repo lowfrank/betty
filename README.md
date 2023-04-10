@@ -20,6 +20,8 @@ In order to compile the interpreter, run the following command after downloading
 cargo b --release
 ```
 
+Note that you must have Rust 1.65 or higher in order to succesfully compile the code.
+
 ## Interpreter options
 <ins>Usage:</ins> `betty.exe [OPTIONS] [PATH] [ARGS]...`
 <ins>Arguments:</ins>
