@@ -73,7 +73,7 @@ pub struct CliParser {
     pub args: Option<Vec<String>>,
 
     /// Stack size
-    #[arg(long, default_value_t = 2 * 1024 * 1024, help = "Allocate memory for the stack")]
+    #[arg(long, default_value_t = 2 * 1024 * 1024, help = "Allocate memory for the stack (in bytes)")]
     pub stack_size: usize,
 }
 
