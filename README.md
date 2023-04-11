@@ -12,7 +12,7 @@ It is a simple yet complete language, featuring:
 - Import external betty files with the `using` statement.
 - Comments start with the pipe symbol.
 - . . . and more.
-For more information, take a look at the [betty documentation](https://lowfrank.github.io/betty-web/html/overview.html)
+For more information, take a look at the [betty documentation](https://lowfrank.github.io/betty-web/html/overview.html){:target="_blank"}
 
 ## Compile betty.exe
 In order to compile the interpreter, run the following command after downloading the repo:
