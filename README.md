@@ -12,6 +12,7 @@ It is a simple yet complete language, featuring:
 - Import external betty files with the `using` statement.
 - Comments start with the pipe symbol.
 - . . . and more.
+For more information, take a look at the [betty documentation](https://lowfrank.github.io/betty-web/html/overview.html)
 
 ## Compile betty.exe
 In order to compile the interpreter, run the following command after downloading the repo:
@@ -21,6 +22,8 @@ cargo b --release
 ```
 
 Note that you must have Rust 1.65 or higher in order to succesfully compile the code.
+
+betty is a fully interpreted language. Unlike Python, which is bytecode interpreted, betty does not create bytecode files upon running.
 
 ## Interpreter options
 <ins>Usage:</ins> `betty.exe [OPTIONS] [PATH] [ARGS]...`
